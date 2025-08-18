@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+//user
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model Car {
+  id                  Int      @id @default(autoincrement())
+  title               String   // Car title or short description
+  listedBy            String   // Dealer or individual
+  registrationYear    Int
+  kmsDriven           Int
+  ownerCount          Int
+  registrationNumber  String   @unique
+  vipNumber           Boolean  @default(false)
+  sellingPrice        Float
+  cutOffPrice         Float
+  ybtPrice            Float
+  insurance           String?
+  carUSP              String?  // Unique Selling Points
+  fuelType            String   // Petrol, Diesel, CNG, Electric, etc.
+  carImage1           String
+  carImage2           String
+  createdAt           DateTime @default(now())
+}
+
+
+
+model Bike {
+  id                  Int      @id @default(autoincrement())
+  title               String
+  listedBy            String
+  registrationYear    Int
+  kmsDriven           Int
+  ownerCount          Int
+  registrationNumber  String   @unique
+  vipNumber           Boolean  @default(false)
+  sellingPrice        Float
+  cutOffPrice         Float
+  ybtPrice            Float
+  insurance           String?
+  bikeUSP             String?
+  fuelType            String
+  bikeImage1          String
+  bikeImage2          String
+  createdAt           DateTime @default(now())
+}
+
