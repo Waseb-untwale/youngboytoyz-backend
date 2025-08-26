@@ -9,6 +9,9 @@ exports.createCar = async (req, res) => {
       registrationYear,
       kmsDriven,
       ownerCount,
+      badges,
+      description,
+      brand,
       registrationNumber,
       vipNumber,
       sellingPrice,
@@ -21,8 +24,26 @@ exports.createCar = async (req, res) => {
 
     const files = req.files;
 
-    const carImage1 = files?.carImage1?.[0]?.path;
-    const carImage2 = files?.carImage2?.[0]?.path;
+    const carImages = [];
+    if (files && files.carImages) {
+      // If multiple files uploaded
+      if (Array.isArray(files.carImages)) {
+        carImages.push(...files.carImages.map((file) => file.path));
+      } else {
+        // If single file uploaded
+        carImages.push(files.carImages.path);
+      }
+    }
+
+    // Handle badges from form-data
+    let processedBadges = [];
+    if (badges) {
+      if (Array.isArray(badges)) {
+        processedBadges = badges;
+      } else {
+        processedBadges = [badges]; // Single badge as string
+      }
+    }
 
     const car = await prisma.car.create({
       data: {
@@ -32,33 +53,65 @@ exports.createCar = async (req, res) => {
         kmsDriven: parseInt(kmsDriven),
         ownerCount: parseInt(ownerCount),
         registrationNumber,
-        vipNumber: vipNumber === "true" ? true : false,
+        vipNumber: vipNumber === "true",
         sellingPrice: parseFloat(sellingPrice),
         cutOffPrice: parseFloat(cutOffPrice),
         ybtPrice: parseFloat(ybtPrice),
         insurance,
+        badges: processedBadges,
+        description,
+        brand,
         carUSP,
         fuelType,
-        carImage1,
-        carImage2,
+        carImages,
       },
     });
 
     res.status(201).json(car);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error("💥 FAILED TO CREATE BIKE:", error);
+
+    res.status(500).json({
+      message: "Failed to create bike.",
+      error: error.message,
+    });
   }
 };
-
-
-
 // Get all cars
 exports.getAllCars = async (req, res) => {
   try {
-    const cars = await prisma.car.findMany();
+    const { fields } = req.query;
+
+    let selectFields = {};
+
+    if (fields) {
+      const fieldArray = fields.split(",").map((field) => field.trim());
+      selectFields = fieldArray.reduce((acc, field) => {
+        acc[field] = true;
+        return acc;
+      }, {});
+    }
+
+    const cars = await prisma.car.findMany({
+      select: Object.keys(selectFields).length > 0 ? selectFields : undefined,
+    });
     res.json(cars);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getTotalCars = async (req, res) => {
+  try {
+    // Use the count() method on your car model for efficiency
+    const totalCars = await prisma.car.count();
+
+    // Send a success response with the total count
+    res.status(200).json({ total: totalCars });
+  } catch (error) {
+    console.error("Failed to get total cars:", error); // Good practice to log the error
+    // Note: Corrected 'err' to 'error' to match the catch parameter
+    res.status(500).json({ error: error.message });
   }
 };
 

@@ -1,6 +1,5 @@
 const prisma = require("../utils/prisma");
 
-// Create a new bike
 exports.createBike = async (req, res) => {
   try {
     const {
@@ -9,6 +8,9 @@ exports.createBike = async (req, res) => {
       registrationYear,
       kmsDriven,
       ownerCount,
+      badges,
+      description,
+      brand,
       registrationNumber,
       vipNumber,
       sellingPrice,
@@ -21,8 +23,23 @@ exports.createBike = async (req, res) => {
 
     const files = req.files;
 
-    const bikeImage1 = files?.bikeImage1?.[0]?.path;
-    const bikeImage2 = files?.bikeImage2?.[0]?.path;
+    const bikeImages = [];
+    if (files && files.bikeImages) {
+      if (Array.isArray(files.bikeImages)) {
+        bikeImages.push(...files.bikeImages.map((file) => file.path));
+      } else {
+        bikeImages.push(files.bikeImages.path);
+      }
+    }
+
+    let processedBadges = [];
+    if (badges) {
+      if (Array.isArray(badges)) {
+        processedBadges = badges;
+      } else {
+        processedBadges = [badges];
+      }
+    }
 
     const bike = await prisma.bike.create({
       data: {
@@ -37,10 +54,12 @@ exports.createBike = async (req, res) => {
         cutOffPrice: parseFloat(cutOffPrice),
         ybtPrice: parseFloat(ybtPrice),
         insurance,
+        badges: processedBadges,
+        description,
+        brand,
         bikeUSP,
         fuelType,
-        bikeImage1,
-        bikeImage2,
+        bikeImages,
       },
     });
 
