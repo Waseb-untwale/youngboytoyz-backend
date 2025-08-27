@@ -33,8 +33,18 @@ model Car {
   ybtPrice           Float
   brand              String?
   insurance          String?
-  carUSP             String? // Unique Selling Points
-  fuelType           String // Petrol, Diesel, CNG, Electric, etc.
+  carUSP             String?
+  carType            String?
+  transmission       String?
+  exteriorColour     String?
+  peakTorque         String?
+  peakPower          String?
+  doors              String?
+  driveType          String?
+  seatingCapacity    String?
+  manufactureYear    Int?
+  engine             String?
+  fuelType           String
   carImages          String[]
   createdAt          DateTime @default(now())
 }
@@ -59,4 +69,22 @@ model Bike {
   fuelType           String
   bikeImages         String[]
   createdAt          DateTime @default(now())
+}
+
+model Event {
+  id               String   @id @default(cuid())
+  title            String
+  slug             String   @unique
+  description      String?
+  maxAttendees     Int?
+  currentAttendees Int
+  location         String
+  startDate        DateTime
+  endDate          DateTime
+  imageUrls        String[] // Renamed for clarity (plural)
+  primaryImage     String? // Make optional
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("events")
 }
