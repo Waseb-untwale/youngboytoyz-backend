@@ -5,19 +5,27 @@ exports.createCar = async (req, res) => {
   try {
     const {
       title,
-      listedBy,
-      registrationYear,
-      kmsDriven,
-      ownerCount,
-      badges,
       description,
-      brand,
-      registrationNumber,
-      vipNumber,
+      status,
+      // Pricing
       sellingPrice,
       cutOffPrice,
       ybtPrice,
+      //registration and ownership
+      registrationYear,
+      registrationNumber,
+      manufactureYear,
+      kmsDriven,
+      ownerCount,
       insurance,
+      //other specs
+      listedBy,
+      badges,
+      vipNumber,
+      city,
+      state,
+      //car Details
+      brand,
       carUSP,
       carType,
       transmission,
@@ -27,9 +35,9 @@ exports.createCar = async (req, res) => {
       doors,
       driveType,
       seatingCapacity,
-      manufactureYear,
       engine,
       fuelType,
+      mileage,
     } = req.body;
 
     const files = req.files;
@@ -59,6 +67,10 @@ exports.createCar = async (req, res) => {
       data: {
         title,
         listedBy,
+        status: status ? status.toUpperCase() : undefined,
+        city,
+        state,
+        mileage: mileage ? parseFloat(mileage) : null,
         registrationYear: parseInt(registrationYear),
         kmsDriven: parseInt(kmsDriven),
         ownerCount: parseInt(ownerCount),
@@ -77,22 +89,22 @@ exports.createCar = async (req, res) => {
         exteriorColour,
         peakTorque,
         peakPower,
-        doors,
-        driveType,
-        seatingCapacity,
+        doors: parseInt(doors),
+        driveType: driveType ? driveType.toUpperCase() : undefined,
+        seatingCapacity: parseInt(seatingCapacity),
         manufactureYear: parseInt(manufactureYear),
         engine,
-        fuelType,
+        fuelType: fuelType ? fuelType.toUpperCase() : undefined,
         carImages,
       },
     });
 
     res.status(201).json(car);
   } catch (error) {
-    console.error("💥 FAILED TO CREATE BIKE:", error);
+    console.error("💥 FAILED TO CREATE CAR:", error);
 
     res.status(500).json({
-      message: "Failed to create bike.",
+      message: "Failed to create car.",
       error: error.message,
     });
   }

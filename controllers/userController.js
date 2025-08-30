@@ -11,13 +11,24 @@ exports.getUsers = async (req, res) => {
 };
 
 exports.createUser = async (req, res) => {
-  const { name, email } = req.body;
+  const { name, email, password } = req.body;
   try {
     const user = await prisma.user.create({
-      data: { name, email },
+      data: { name, email, password },
     });
     res.status(201).json(user);
   } catch (error) {
+    console.log(error);
+
     res.status(500).json({ error: "Failed to create user" });
+  }
+};
+
+exports.totalUsers = async (req, res) => {
+  try {
+    const totalUsers = await prisma.user.count();
+    res.status(200).json({ totalUsers: totalUsers });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch users" });
   }
 };

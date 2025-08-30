@@ -17,36 +17,78 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+enum VehicleStatus {
+  AVAILABLE
+  SOLD
+  PENDING
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  ELECTRIC
+  HYBRID
+  CNG
+}
+
+// enum TransmissionType {
+//   MANUAL
+//   AUTOMATIC
+// }
+
+enum DriveType {
+  FWD
+  RWD
+  AWD
+  FOUR_WD
+}
+
 model Car {
-  id                 Int      @id @default(autoincrement())
-  title              String // Car title or short description
-  listedBy           String // Dealer or individual
+  id          Int           @id @default(autoincrement())
+  title       String
+  description String?
+  status      VehicleStatus @default(AVAILABLE)
+
+  // --- Pricing ---
+
+  sellingPrice Float
+  cutOffPrice  Float
+  ybtPrice     Float
+
+  // --- Ownership & History ---
+
   registrationYear   Int
+  registrationNumber String  @unique
+  manufactureYear    Int?
   kmsDriven          Int
   ownerCount         Int
-  badges             String[]
-  description        String?
-  registrationNumber String   @unique
-  vipNumber          Boolean  @default(false)
-  sellingPrice       Float
-  cutOffPrice        Float
-  ybtPrice           Float
-  brand              String?
   insurance          String?
-  carUSP             String?
-  carType            String?
-  transmission       String?
-  exteriorColour     String?
-  peakTorque         String?
-  peakPower          String?
-  doors              String?
-  driveType          String?
-  seatingCapacity    String?
-  manufactureYear    Int?
-  engine             String?
-  fuelType           String
-  carImages          String[]
-  createdAt          DateTime @default(now())
+
+  //Other Specs
+  listedBy  String
+  badges    String[]
+  vipNumber Boolean  @default(false)
+  city      String?
+  state     String?
+
+  //car details
+  brand           String?
+  carUSP          String?
+  carType         String?
+  transmission    String?
+  exteriorColour  String?
+  peakTorque      String?
+  peakPower       String?
+  doors           Int?
+  driveType       DriveType?
+  seatingCapacity Int?
+  engine          String?
+  fuelType        FuelType   @default(PETROL)
+  mileage         Float?
+
+  carImages String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Bike {
@@ -69,6 +111,7 @@ model Bike {
   fuelType           String
   bikeImages         String[]
   createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model Event {

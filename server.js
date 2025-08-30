@@ -9,6 +9,7 @@ app.use(express.json());
 const bikeRoutes = require("./routes/bikeRoutes");
 const authRoutes = require("./routes/authRoutes");
 const vehicleRoute = require("./routes/vehicleRoute");
+const eventRoute = require("./routes/eventRoute");
 
 app.use(cors());
 
@@ -28,6 +29,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/cars", carRoutes);
 app.use("/api/bikes", bikeRoutes);
 app.use("/api/vehicles", vehicleRoute);
+app.use("/api/events", eventRoute);
 
 app.use((err, req, res, next) => {
   console.error("--- UNHANDLED ERROR ---", err); // Log the full error
