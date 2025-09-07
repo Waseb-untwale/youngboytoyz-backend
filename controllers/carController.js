@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const createSlug = require("../utils/slugify");
 
 // Create a new car
 exports.createCar = async (req, res) => {
@@ -39,6 +40,8 @@ exports.createCar = async (req, res) => {
       fuelType,
       mileage,
     } = req.body;
+
+    const slug = createSlug(`${brand} ${title}`);
 
     const files = req.files;
 
@@ -82,6 +85,7 @@ exports.createCar = async (req, res) => {
         insurance,
         badges: processedBadges,
         description,
+        slug,
         brand,
         carUSP,
         carType,
@@ -109,25 +113,67 @@ exports.createCar = async (req, res) => {
     });
   }
 };
-// Get all cars
+
 exports.getAllCars = async (req, res) => {
   try {
+    const limit = parseInt(req.query.limit) || 10;
+    const cursor = req.query.cursor ? JSON.parse(req.query.cursor) : undefined;
+
     const { fields } = req.query;
-
-    let selectFields = {};
-
+    let selectFields = {
+      id: true,
+      title: true,
+      description: true,
+      brand: true,
+      status: true,
+      badges: true,
+      thumbnail: true,
+      createdAt: true,
+    };
     if (fields) {
       const fieldArray = fields.split(",").map((field) => field.trim());
       selectFields = fieldArray.reduce((acc, field) => {
-        acc[field] = true;
+        {
+          acc[field] = true;
+        }
         return acc;
       }, {});
     }
 
-    const cars = await prisma.car.findMany({
-      select: Object.keys(selectFields).length > 0 ? selectFields : undefined,
+    const prismaQueryOptions = {
+      take: limit,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: selectFields,
+    };
+
+    if (cursor) {
+      prismaQueryOptions.cursor = {
+        createdAt: new Date(cursor.createdAt),
+        id: cursor.id,
+      };
+      prismaQueryOptions.skip = 1; // skip the cursor item itself
+    }
+
+    console.time("prisma");
+    const cars = await prisma.car.findMany(prismaQueryOptions);
+    console.timeEnd("prisma");
+
+    console.time("resJson");
+
+    let nextCursor = null;
+    if (cars.length === limit) {
+      const lastCar = cars[cars.length - 1];
+      nextCursor = JSON.stringify({
+        createdAt: lastCar.createdAt,
+        id: lastCar.id,
+      });
+    }
+
+    res.json({
+      data: cars,
+      nextCursor,
     });
-    res.json(cars);
+    console.timeEnd("resJson");
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -135,19 +181,14 @@ exports.getAllCars = async (req, res) => {
 
 exports.getTotalCars = async (req, res) => {
   try {
-    // Use the count() method on your car model for efficiency
     const totalCars = await prisma.car.count();
-
-    // Send a success response with the total count
     res.status(200).json({ total: totalCars });
   } catch (error) {
-    console.error("Failed to get total cars:", error); // Good practice to log the error
-    // Note: Corrected 'err' to 'error' to match the catch parameter
+    console.error("Failed to get total cars:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// Get a single car by ID
 exports.getCarById = async (req, res) => {
   try {
     const car = await prisma.car.findUnique({
@@ -160,7 +201,6 @@ exports.getCarById = async (req, res) => {
   }
 };
 
-// Update a car
 exports.updateCar = async (req, res) => {
   try {
     const updatedCar = await prisma.car.update({
@@ -173,7 +213,6 @@ exports.updateCar = async (req, res) => {
   }
 };
 
-// Delete a car
 exports.deleteCar = async (req, res) => {
   try {
     await prisma.car.delete({
@@ -184,3 +223,27 @@ exports.deleteCar = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Get all cars Original
+// exports.getAllCars = async (req, res) => {
+//   try {
+//     const { fields } = req.query;
+
+//     let selectFields = {};
+
+//     if (fields) {
+//       const fieldArray = fields.split(",").map((field) => field.trim());
+//       selectFields = fieldArray.reduce((acc, field) => {
+//         acc[field] = true;
+//         return acc;
+//       }, {});
+//     }
+
+//     const cars = await prisma.car.findMany({
+//       select: Object.keys(selectFields).length > 0 ? selectFields : undefined,
+//     });
+//     res.json(cars);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// };

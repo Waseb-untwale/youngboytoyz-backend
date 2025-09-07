@@ -91,6 +91,7 @@ model Car {
   vipNumber Boolean  @default(false)
   city      String?
   state     String?
+  slug      String?  @unique
 
   //car details
   brand           String?
@@ -106,10 +107,12 @@ model Car {
   engine          String?
   fuelType        FuelType   @default(PETROL)
   mileage         Float?
+  thumbnail       String?
+  carImages       String[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  carImages String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@index([createdAt, id])
 }
 
 model Bike {
