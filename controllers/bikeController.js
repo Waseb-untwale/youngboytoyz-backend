@@ -72,14 +72,90 @@ exports.createBike = async (req, res) => {
 // Get all bikes
 exports.getAllBikes = async (req, res) => {
   try {
-    const bikes = await prisma.bike.findMany();
-    res.json(bikes);
+    const limit = parseInt(req.query.limit) || 10;
+    const cursor = req.query.cursor ? JSON.parse(req.query.cursor) : undefined;
+
+    const { searchTerm, brands, sortBy = "newest" } = req.query;
+
+    const where = {};
+
+    if (searchTerm) {
+      where.OR = [
+        { title: { contains: searchTerm, mode: "insensitive" } },
+        { description: { contains: searchTerm, mode: "insensitive" } },
+      ];
+    }
+
+    if (brands) {
+      const brandList = brands.split(",");
+      if (brandList.length > 0) {
+        where.brand = { in: brandList };
+      }
+    }
+
+    let orderBy;
+    switch (sortBy) {
+      case "name_asc":
+        orderBy = { title: "asc" };
+        break;
+      case "name_desc":
+        orderBy = { title: "desc" };
+        break;
+      case "oldest":
+        orderBy = [{ createdAt: "asc" }, { id: "asc" }];
+        break;
+      case "newest":
+      default:
+        orderBy = [{ createdAt: "desc" }, { id: "desc" }];
+        break;
+    }
+
+    const prismaQueryOptions = {
+      take: limit,
+      where,
+      orderBy,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        brand: true,
+        badges: true,
+        thumbnail: true,
+        createdAt: true,
+      },
+    };
+
+    if (cursor && (sortBy === "newest" || sortBy === "oldest")) {
+      prismaQueryOptions.cursor = {
+        createdAt_id: {
+          createdAt: new Date(cursor.createdAt),
+          id: cursor.id,
+        },
+      };
+      prismaQueryOptions.skip = 1;
+    }
+
+    const bikes = await prisma.bike.findMany(prismaQueryOptions);
+
+    let nextCursor = null;
+    if (bikes.length === limit) {
+      const lastBike = bikes[bikes.length - 1];
+      nextCursor = JSON.stringify({
+        createdAt: lastBike.createdAt,
+        id: lastBike.id,
+      });
+    }
+
+    res.json({
+      data: bikes,
+      nextCursor,
+    });
   } catch (error) {
+    console.error("Error in getAllCars:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// Get a single bike
 exports.getBikeById = async (req, res) => {
   try {
     const bike = await prisma.bike.findUnique({
@@ -92,7 +168,6 @@ exports.getBikeById = async (req, res) => {
   }
 };
 
-// Update a bike
 exports.updateBike = async (req, res) => {
   try {
     const updatedBike = await prisma.bike.update({

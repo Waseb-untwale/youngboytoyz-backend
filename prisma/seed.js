@@ -3,7 +3,7 @@ const { faker } = require("@faker-js/faker");
 
 const prisma = new PrismaClient();
 
-// A simple slug creation function, similar to what you might have
+// A simple slug creation function
 const createSlug = (text) => {
   return text
     .toLowerCase()
@@ -17,21 +17,41 @@ async function main() {
   await prisma.car.deleteMany({});
   console.log("🗑️  Cleared previous car data.");
 
-  const numberOfCars = 50000;
+  const numberOfCars = 5000;
 
   for (let i = 0; i < numberOfCars; i++) {
     const brand = faker.vehicle.manufacturer();
     const model = faker.vehicle.model();
     const title = `${brand} ${model}`;
     const slug = createSlug(`${title}-${faker.string.alphanumeric(6)}`);
+    const carImages = [
+      faker.image.urlLoremFlickr({
+        category: "transport",
+        width: 1280,
+        height: 720,
+      }),
+      faker.image.urlLoremFlickr({
+        category: "transport",
+        width: 1280,
+        height: 720,
+      }),
+      faker.image.urlLoremFlickr({
+        category: "transport",
+        width: 1280,
+        height: 720,
+      }),
+      faker.image.urlLoremFlickr({
+        category: "transport",
+        width: 1280,
+        height: 720,
+      }),
+    ];
 
     const carData = {
       title,
       slug,
       description: faker.lorem.paragraph(),
       status: faker.helpers.arrayElement(["AVAILABLE", "SOLD", "PENDING"]),
-
-      // Pricing
       sellingPrice: parseFloat(
         faker.commerce.price({ min: 500000, max: 5000000 })
       ),
@@ -39,8 +59,6 @@ async function main() {
         faker.commerce.price({ min: 450000, max: 4800000 })
       ),
       ybtPrice: parseFloat(faker.commerce.price({ min: 480000, max: 4900000 })),
-
-      // Registration and ownership
       registrationYear: faker.date.past({ years: 10 }).getFullYear(),
       manufactureYear: faker.date.past({ years: 11 }).getFullYear(),
       registrationNumber: `${faker.location.state({
@@ -57,7 +75,7 @@ async function main() {
       ]),
 
       // Other specs
-      listedBy: "Dealer", // or faker.company.name()
+      listedBy: "Dealer",
       badges: faker.helpers.arrayElements(
         ["BEST_SELLER", "RARE_FIND", "LOW_KMS"],
         { min: 1, max: 2 }
@@ -87,13 +105,8 @@ async function main() {
       mileage: parseFloat(
         faker.number.float({ min: 8, max: 25, precision: 0.1 })
       ),
-
-      // For images, we use placeholder URLs since we're not uploading files
-      carImages: [
-        faker.image.urlLoremFlickr({ category: "transport" }),
-        faker.image.urlLoremFlickr({ category: "transport" }),
-        faker.image.urlLoremFlickr({ category: "transport" }),
-      ],
+      thumbnail: carImages[0],
+      carImages: carImages,
     };
 
     await prisma.car.create({ data: carData });

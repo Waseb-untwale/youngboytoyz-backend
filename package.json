@@ -6,6 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server.js",
     "seed": "node prisma/seed.js",
+    "seedbike":"node prisma/seedBike.js",
     "start": "node server.js"
   },
   "keywords": [],

@@ -112,6 +112,8 @@ model Car {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
+  @@index([title])
+  @@index([brand])
   @@index([createdAt, id])
 }
 
@@ -134,6 +136,7 @@ model Bike {
   bikeUSP            String?
   fuelType           String
   bikeImages         String[]
+  thumbnail          String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }

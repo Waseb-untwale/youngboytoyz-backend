@@ -116,50 +116,79 @@ exports.createCar = async (req, res) => {
 
 exports.getAllCars = async (req, res) => {
   try {
+    // --- Pagination ---
     const limit = parseInt(req.query.limit) || 10;
     const cursor = req.query.cursor ? JSON.parse(req.query.cursor) : undefined;
 
-    const { fields } = req.query;
-    let selectFields = {
-      id: true,
-      title: true,
-      description: true,
-      brand: true,
-      status: true,
-      badges: true,
-      thumbnail: true,
-      createdAt: true,
-    };
-    if (fields) {
-      const fieldArray = fields.split(",").map((field) => field.trim());
-      selectFields = fieldArray.reduce((acc, field) => {
-        {
-          acc[field] = true;
-        }
-        return acc;
-      }, {});
+    // --- New Filter and Sort Parameters ---
+    const { searchTerm, brands, sortBy = "newest" } = req.query; // Default sort to 'newest'
+
+    // --- Build Dynamic WHERE clause for Prisma ---
+    const where = {};
+
+    if (searchTerm) {
+      where.OR = [
+        { title: { contains: searchTerm, mode: "insensitive" } },
+        { description: { contains: searchTerm, mode: "insensitive" } },
+      ];
     }
 
+    if (brands) {
+      // Expecting a comma-separated string like "Audi,BMW,Ferrari"
+      const brandList = brands.split(",");
+      if (brandList.length > 0) {
+        where.brand = { in: brandList };
+      }
+    }
+
+    // --- Build Dynamic ORDER BY clause for Prisma ---
+    let orderBy;
+    switch (sortBy) {
+      case "name_asc": // name (A-Z)
+        orderBy = { title: "asc" };
+        break;
+      case "name_desc": // name (Z-A)
+        orderBy = { title: "desc" };
+        break;
+      case "oldest":
+        orderBy = [{ createdAt: "asc" }, { id: "asc" }];
+        break;
+      case "newest":
+      default:
+        orderBy = [{ createdAt: "desc" }, { id: "desc" }];
+        break;
+    }
+
+    // --- Construct the final Prisma query ---
     const prismaQueryOptions = {
       take: limit,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      select: selectFields,
+      where, // Apply the dynamic where clause
+      orderBy, // Apply the dynamic order by clause
+      select: {
+        // Selecting only necessary fields
+        id: true,
+        title: true,
+        description: true,
+        brand: true,
+        badges: true,
+        thumbnail: true, // Assuming this is the relation/field name
+        createdAt: true, // Needed for cursor
+      },
     };
 
-    if (cursor) {
+    if (cursor && (sortBy === "newest" || sortBy === "oldest")) {
       prismaQueryOptions.cursor = {
-        createdAt: new Date(cursor.createdAt),
-        id: cursor.id,
+        createdAt_id: {
+          createdAt: new Date(cursor.createdAt),
+          id: cursor.id,
+        },
       };
-      prismaQueryOptions.skip = 1; // skip the cursor item itself
+      prismaQueryOptions.skip = 1;
     }
 
-    console.time("prisma");
     const cars = await prisma.car.findMany(prismaQueryOptions);
-    console.timeEnd("prisma");
 
-    console.time("resJson");
-
+    // --- Determine the next cursor ---
     let nextCursor = null;
     if (cars.length === limit) {
       const lastCar = cars[cars.length - 1];
@@ -173,9 +202,9 @@ exports.getAllCars = async (req, res) => {
       data: cars,
       nextCursor,
     });
-    console.timeEnd("resJson");
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Error in getAllCars:", err);
+    res.status(500).json({ error: "Something went wrong" });
   }
 };
 
