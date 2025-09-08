@@ -39,6 +39,7 @@ exports.createCar = async (req, res) => {
       engine,
       fuelType,
       mileage,
+      thumbnail,
     } = req.body;
 
     const slug = createSlug(`${brand} ${title}`);
@@ -100,6 +101,7 @@ exports.createCar = async (req, res) => {
         engine,
         fuelType: fuelType ? fuelType.toUpperCase() : undefined,
         carImages,
+        thumbnail,
       },
     });
 
