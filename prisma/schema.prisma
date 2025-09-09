@@ -19,7 +19,36 @@ enum Gender {
   PREFER_NOT_TO_SAY
 }
 
-//user
+enum VehicleStatus {
+  AVAILABLE
+  SOLD
+  PENDING
+  RESERVED // Added for when user shows interest
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  ELECTRIC
+  HYBRID
+  CNG
+}
+
+enum DriveType {
+  FWD
+  RWD
+  AWD
+  FOUR_WD
+}
+
+enum OwnershipStatus {
+  PENDING // User registered interest
+  APPROVED // Ownership approved
+  REJECTED // Ownership rejected
+  COMPLETED // Transaction completed
+}
+
+// User model - enhanced
 model User {
   id          Int       @id @default(autoincrement())
   name        String
@@ -36,32 +65,28 @@ model User {
   role        Role      @default(USER)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  // Relations
+  ownedCars  CarOwnership[]
+  ownedBikes BikeOwnership[]
 }
 
-enum VehicleStatus {
-  AVAILABLE
-  SOLD
-  PENDING
-}
+// Dealer/Company model for "listedBy"
+model Dealer {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // e.g., "GC Motors", "AutoMax"
+  email     String?  @unique
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-enum FuelType {
-  PETROL
-  DIESEL
-  ELECTRIC
-  HYBRID
-  CNG
-}
-
-// enum TransmissionType {
-//   MANUAL
-//   AUTOMATIC
-// }
-
-enum DriveType {
-  FWD
-  RWD
-  AWD
-  FOUR_WD
+  // Relations
+  cars  Car[]
+  bikes Bike[]
 }
 
 model Car {
@@ -70,13 +95,9 @@ model Car {
   description String?
   status      VehicleStatus @default(AVAILABLE)
 
-  // --- Pricing ---
-
   sellingPrice Float
   cutOffPrice  Float
   ybtPrice     Float
-
-  // --- Ownership & History ---
 
   registrationYear   Int
   registrationNumber String  @unique
@@ -85,15 +106,14 @@ model Car {
   ownerCount         Int
   insurance          String?
 
-  //Other Specs
-  listedBy  String
+  dealerId  Int // Foreign key to Dealer
+  dealer    Dealer   @relation(fields: [dealerId], references: [id])
   badges    String[]
   vipNumber Boolean  @default(false)
   city      String?
   state     String?
   slug      String?  @unique
 
-  //car details
   brand           String?
   carUSP          String?
   carType         String?
@@ -109,25 +129,30 @@ model Car {
   mileage         Float?
   thumbnail       String?
   carImages       String[]
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerships CarOwnership[]
 
   @@index([title])
   @@index([brand])
   @@index([createdAt, id])
+  @@index([status])
+  @@index([dealerId])
 }
 
+// Enhanced Bike model
 model Bike {
-  id                 Int      @id @default(autoincrement())
+  id                 Int           @id @default(autoincrement())
   title              String
-  listedBy           String
   registrationYear   Int
   kmsDriven          Int
   ownerCount         Int
   badges             String[]
   description        String?
-  registrationNumber String   @unique
-  vipNumber          Boolean  @default(false)
+  registrationNumber String        @unique
+  vipNumber          Boolean       @default(false)
   sellingPrice       Float
   cutOffPrice        Float
   ybtPrice           Float
@@ -137,8 +162,64 @@ model Bike {
   fuelType           String
   bikeImages         String[]
   thumbnail          String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  status             VehicleStatus @default(AVAILABLE)
+
+  // Dealer relation
+  dealerId Int
+  dealer   Dealer @relation(fields: [dealerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ownerships BikeOwnership[]
+
+  @@index([title])
+  @@index([brand])
+  @@index([status])
+  @@index([dealerId])
+}
+
+// Car ownership tracking
+model CarOwnership {
+  id     Int             @id @default(autoincrement())
+  userId Int
+  user   User            @relation(fields: [userId], references: [id])
+  carId  Int
+  car    Car             @relation(fields: [carId], references: [id])
+  status OwnershipStatus @default(PENDING)
+  notes  String? // Admin notes
+
+  // Timeline
+  requestedAt DateTime  @default(now())
+  approvedAt  DateTime?
+  completedAt DateTime?
+
+  @@unique([userId, carId]) // User can only have one ownership record per car
+  @@index([userId])
+  @@index([carId])
+  @@index([status])
+}
+
+// Bike ownership tracking
+model BikeOwnership {
+  id     Int             @id @default(autoincrement())
+  userId Int
+  user   User            @relation(fields: [userId], references: [id])
+  bikeId Int
+  bike   Bike            @relation(fields: [bikeId], references: [id])
+  status OwnershipStatus @default(PENDING)
+  notes  String? // Admin notes
+
+  // Timeline
+  requestedAt DateTime  @default(now())
+  approvedAt  DateTime?
+  completedAt DateTime?
+
+  @@unique([userId, bikeId]) // User can only have one ownership record per bike
+  @@index([userId])
+  @@index([bikeId])
+  @@index([status])
 }
 
 model Event {
@@ -151,8 +232,8 @@ model Event {
   location         String
   startDate        DateTime
   endDate          DateTime
-  imageUrls        String[] // Renamed for clarity (plural)
-  primaryImage     String? // Make optional
+  imageUrls        String[]
+  primaryImage     String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

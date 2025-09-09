@@ -30,7 +30,7 @@ exports.createCar = async (req, res) => {
       ownerCount,
       insurance,
       //other specs
-      listedBy,
+      dealerId,
       badges,
       vipNumber,
       city,
@@ -50,6 +50,10 @@ exports.createCar = async (req, res) => {
       fuelType,
       mileage,
     } = req.body;
+
+    if (!dealerId) {
+      return res.status(400).json({ message: "A dealerId is required." });
+    }
 
     const slug = createSlug(`${brand} ${title}`);
 
@@ -79,7 +83,7 @@ exports.createCar = async (req, res) => {
     const car = await prisma.car.create({
       data: {
         title,
-        listedBy,
+        dealerId: parseInt(dealerId),
         status: status ? status.toUpperCase() : undefined,
         city,
         state,
@@ -275,6 +279,9 @@ exports.getCarById = async (req, res) => {
     console.log(`Fetching car ${id} from database... 💿`);
     const car = await prisma.car.findUnique({
       where: { id: parseInt(id) },
+      include: {
+        dealer: true,
+      },
     });
 
     if (!car) return res.status(404).json({ error: "Car not found" });

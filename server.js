@@ -10,6 +10,7 @@ const bikeRoutes = require("./routes/bikeRoutes");
 const authRoutes = require("./routes/authRoutes");
 const vehicleRoute = require("./routes/vehicleRoute");
 const eventRoute = require("./routes/eventRoute");
+const dealerRoute = require("./routes/dealerRoute");
 const redis = require("./utils/redis");
 
 app.use(cors());
@@ -25,12 +26,13 @@ async function testdbconnection() {
   }
 }
 
-app.use("/api/users", userRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/cars", carRoutes);
-app.use("/api/bikes", bikeRoutes);
-app.use("/api/vehicles", vehicleRoute);
-app.use("/api/events", eventRoute);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/cars", carRoutes);
+app.use("/api/v1/bikes", bikeRoutes);
+app.use("/api/v1/vehicles", vehicleRoute);
+app.use("/api/v1/events", eventRoute);
+app.use("/api/v1/dealer", dealerRoute);
 
 app.use((err, req, res, next) => {
   console.error("--- UNHANDLED ERROR ---", err); // Log the full error
