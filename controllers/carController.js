@@ -1,5 +1,15 @@
 const prisma = require("../utils/prisma");
 const createSlug = require("../utils/slugify");
+const redis = require("../utils/redis");
+
+const clearListCaches = async () => {
+  console.log("Clearing list caches...");
+  const keys = await redis.keys("cars:all:*"); // Find all keys for getAllCars
+  if (keys.length > 0) {
+    await redis.del(keys); // Delete them
+  }
+  await redis.del("cars:total"); // Delete the total count
+};
 
 // Create a new car
 exports.createCar = async (req, res) => {
@@ -39,7 +49,6 @@ exports.createCar = async (req, res) => {
       engine,
       fuelType,
       mileage,
-      thumbnail,
     } = req.body;
 
     const slug = createSlug(`${brand} ${title}`);
@@ -101,9 +110,13 @@ exports.createCar = async (req, res) => {
         engine,
         fuelType: fuelType ? fuelType.toUpperCase() : undefined,
         carImages,
-        thumbnail,
+        thumbnail:
+          carImages[0] ||
+          "https://placehold.co/800x600/EFEFEF/AAAAAA?text=Image+Not+Available",
       },
     });
+
+    await clearListCaches();
 
     res.status(201).json(car);
   } catch (error) {
@@ -117,7 +130,23 @@ exports.createCar = async (req, res) => {
 };
 
 exports.getAllCars = async (req, res) => {
+  const cacheKey = `cars:all:${req.originalUrl}`;
+
   try {
+    let cachedCars = null;
+
+    try {
+      cachedCars = await redis.get(cacheKey);
+    } catch (cacheError) {
+      console.error("Redis error on GET:", cacheError.message);
+    }
+
+    if (cachedCars) {
+      console.log("Serving getAllCars from cache...  cache ⚡");
+      return res.json(JSON.parse(cachedCars));
+    }
+
+    console.log("Fetching getAllCars from database... 💿");
     // --- Pagination ---
     const limit = parseInt(req.query.limit) || 10;
     const cursor = req.query.cursor ? JSON.parse(req.query.cursor) : undefined;
@@ -200,10 +229,11 @@ exports.getAllCars = async (req, res) => {
       });
     }
 
-    res.json({
-      data: cars,
-      nextCursor,
-    });
+    const responseData = { data: cars, nextCursor };
+
+    await redis.set(cacheKey, JSON.stringify(responseData), "EX", 3600);
+
+    res.json(responseData);
   } catch (err) {
     console.error("Error in getAllCars:", err);
     res.status(500).json({ error: "Something went wrong" });
@@ -211,8 +241,19 @@ exports.getAllCars = async (req, res) => {
 };
 
 exports.getTotalCars = async (req, res) => {
+  const cacheKey = "cars:total";
   try {
+    const cachedTotal = await redis.get(cacheKey);
+
+    if (cachedTotal) {
+      console.log("Serving total cars from cache... ⚡");
+      return res.status(200).json({ total: parseInt(cachedTotal) });
+    }
+
+    console.log("Fetching total cars from database... 💿");
     const totalCars = await prisma.car.count();
+
+    await redis.set(cacheKey, totalCars, "EX", 300);
     res.status(200).json({ total: totalCars });
   } catch (error) {
     console.error("Failed to get total cars:", error);
@@ -221,11 +262,24 @@ exports.getTotalCars = async (req, res) => {
 };
 
 exports.getCarById = async (req, res) => {
+  const { id } = req.params;
+  const cacheKey = `cars:${id}`;
   try {
+    const cachedCar = await redis.get(cacheKey);
+
+    if (cachedCar) {
+      console.log(`Serving car ${id} from cache... ⚡`);
+      return res.json(JSON.parse(cachedCar));
+    }
+
+    console.log(`Fetching car ${id} from database... 💿`);
     const car = await prisma.car.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id: parseInt(id) },
     });
+
     if (!car) return res.status(404).json({ error: "Car not found" });
+
+    await redis.set(cacheKey, JSON.stringify(car), "EX", 3600);
     res.json(car);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -233,11 +287,15 @@ exports.getCarById = async (req, res) => {
 };
 
 exports.updateCar = async (req, res) => {
+  const { id } = req.params;
   try {
     const updatedCar = await prisma.car.update({
       where: { id: parseInt(req.params.id) },
       data: req.body,
     });
+
+    await clearListCaches();
+    await redis.del(`cars:${id}`);
     res.json(updatedCar);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -245,36 +303,15 @@ exports.updateCar = async (req, res) => {
 };
 
 exports.deleteCar = async (req, res) => {
+  const { id } = req.params;
   try {
     await prisma.car.delete({
       where: { id: parseInt(req.params.id) },
     });
+    await clearListCaches();
+    await redis.del(`cars:${id}`);
     res.json({ message: "Car deleted" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
-
-// Get all cars Original
-// exports.getAllCars = async (req, res) => {
-//   try {
-//     const { fields } = req.query;
-
-//     let selectFields = {};
-
-//     if (fields) {
-//       const fieldArray = fields.split(",").map((field) => field.trim());
-//       selectFields = fieldArray.reduce((acc, field) => {
-//         acc[field] = true;
-//         return acc;
-//       }, {});
-//     }
-
-//     const cars = await prisma.car.findMany({
-//       select: Object.keys(selectFields).length > 0 ? selectFields : undefined,
-//     });
-//     res.json(cars);
-//   } catch (err) {
-//     res.status(500).json({ error: err.message });
-//   }
-// };

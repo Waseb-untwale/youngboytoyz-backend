@@ -10,6 +10,7 @@ const bikeRoutes = require("./routes/bikeRoutes");
 const authRoutes = require("./routes/authRoutes");
 const vehicleRoute = require("./routes/vehicleRoute");
 const eventRoute = require("./routes/eventRoute");
+const redis = require("./utils/redis");
 
 app.use(cors());
 

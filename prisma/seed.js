@@ -3,7 +3,6 @@ const { faker } = require("@faker-js/faker");
 
 const prisma = new PrismaClient();
 
-// A simple slug creation function
 const createSlug = (text) => {
   return text
     .toLowerCase()
@@ -11,41 +10,39 @@ const createSlug = (text) => {
     .replace(/[^\w-]+/g, "");
 };
 
+// Free Unsplash car images (high-quality, hotlinkable)
+const carImagePool = [
+  "https://images.unsplash.com/photo-1503376780353-7e6692767b70",
+  "https://images.unsplash.com/photo-1502877338535-766e1452684a",
+  "https://images.unsplash.com/photo-1511391033795-2b1d6fbb74cd",
+  "https://images.unsplash.com/photo-1552519507-da3b142c6e3d",
+  "https://images.unsplash.com/photo-1549921296-3a0830b72b07",
+  "https://images.unsplash.com/photo-1517949908110-bbcf576da1a5",
+  "https://images.unsplash.com/photo-1525609004556-c46c7d6cf023",
+  "https://images.unsplash.com/photo-1552519507-2b1d6fbb74cd",
+  "https://images.unsplash.com/photo-1597009513361-1cfb3e1d4c89",
+  "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf",
+];
+
 async function main() {
   console.log("🌱 Starting the seeding process...");
 
   await prisma.car.deleteMany({});
   console.log("🗑️  Cleared previous car data.");
 
-  const numberOfCars = 5000;
+  const numberOfCars = 100; // reduced for testing
 
   for (let i = 0; i < numberOfCars; i++) {
     const brand = faker.vehicle.manufacturer();
     const model = faker.vehicle.model();
     const title = `${brand} ${model}`;
     const slug = createSlug(`${title}-${faker.string.alphanumeric(6)}`);
-    const carImages = [
-      faker.image.urlLoremFlickr({
-        category: "transport",
-        width: 1280,
-        height: 720,
-      }),
-      faker.image.urlLoremFlickr({
-        category: "transport",
-        width: 1280,
-        height: 720,
-      }),
-      faker.image.urlLoremFlickr({
-        category: "transport",
-        width: 1280,
-        height: 720,
-      }),
-      faker.image.urlLoremFlickr({
-        category: "transport",
-        width: 1280,
-        height: 720,
-      }),
-    ];
+
+    // pick 3–4 random images from pool
+    const carImages = faker.helpers.arrayElements(carImagePool, {
+      min: 3,
+      max: 4,
+    });
 
     const carData = {
       title,
@@ -74,7 +71,6 @@ async function main() {
         "None",
       ]),
 
-      // Other specs
       listedBy: "Dealer",
       badges: faker.helpers.arrayElements(
         ["BEST_SELLER", "RARE_FIND", "LOW_KMS"],
@@ -84,7 +80,6 @@ async function main() {
       city: faker.location.city(),
       state: faker.location.state(),
 
-      // Car Details
       brand,
       carUSP: faker.lorem.sentence(),
       carType: faker.helpers.arrayElement([
