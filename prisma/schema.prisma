@@ -135,6 +135,8 @@ model Car {
 
   ownerships CarOwnership[]
 
+  leads BookingLead[]
+
   @@index([title])
   @@index([brand])
   @@index([createdAt, id])
@@ -220,6 +222,26 @@ model BikeOwnership {
   @@index([userId])
   @@index([bikeId])
   @@index([status])
+}
+
+model BookingLead {
+  id    Int @id @default(autoincrement())
+  carId Int
+  car   Car @relation(fields: [carId], references: [id])
+
+  // Guest's contact information from the form
+  name    String
+  email   String
+  phone   String
+  address String?
+
+  status String  @default("NEW") // e.g., NEW, CONTACTED, CLOSED
+  notes  String? // Admin notes
+
+  createdAt DateTime @default(now())
+
+  @@index([carId])
+  @@index([email])
 }
 
 model Event {

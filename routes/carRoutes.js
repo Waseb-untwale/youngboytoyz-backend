@@ -3,6 +3,7 @@ const router = express.Router();
 const carController = require("../controllers/carController");
 const upload = require("../middleware/upload");
 const { body } = require("express-validator");
+const { protect } = require("../middleware/authMiddleware");
 
 const carValidationRules = [
   body("title").trim().notEmpty().withMessage("Car title is required."),
@@ -38,6 +39,8 @@ router.get("/", carController.getAllCars);
 router.get("/count", carController.getTotalCars);
 router.get("/:id", carController.getCarById);
 router.put("/:id", carController.updateCar);
+router.post("/:carId/book", protect, carController.bookCar);
+router.post("/:carId/guest-book", carController.createGuestBooking);
 router.delete("/:id", carController.deleteCar);
 
 module.exports = router;

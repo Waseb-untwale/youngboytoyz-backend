@@ -309,6 +309,128 @@ exports.updateCar = async (req, res) => {
   }
 };
 
+exports.createGuestBooking = async (req, res) => {
+  try {
+    const { carId } = req.params;
+    // Get the data from the form the user filled out
+    const { name, email, phone, address } = req.body;
+
+    // --- Validation ---
+    if (!name || !email || !phone) {
+      return res
+        .status(400)
+        .json({ message: "Name, email, and phone are required." });
+    }
+
+    const newLead = await prisma.$transaction(async (tx) => {
+      const car = await tx.car.findUnique({ where: { id: parseInt(carId) } });
+      if (!car) throw new Error("Car not found.");
+      if (car.status !== "AVAILABLE")
+        throw new Error("This car is not available for booking.");
+
+      // Create a record in the new BookingLead table
+      const lead = await tx.bookingLead.create({
+        data: {
+          carId: parseInt(carId),
+          name,
+          email,
+          phone,
+          address,
+        },
+      });
+
+      // Also reserve the car so no one else can book it
+      await tx.car.update({
+        where: { id: parseInt(carId) },
+        data: { status: "RESERVED" },
+      });
+
+      return lead;
+    });
+
+    res.status(201).json({
+      message: "Thank you for your interest! We will contact you shortly.",
+      lead: newLead,
+    });
+  } catch (error) {
+    console.error("Failed to create guest booking:", error);
+    if (error.message.includes("not found"))
+      return res.status(404).json({ message: error.message });
+    if (error.message.includes("not available"))
+      return res.status(409).json({ message: error.message });
+    res.status(500).json({ message: "Unable to process your request." });
+  }
+};
+
+exports.bookCar = async (req, res) => {
+  try {
+    // 1. Get the carId from the URL parameters
+    const { carId } = req.params;
+    // 2. Get the authenticated user's ID from the token (via auth middleware)
+    const userId = req.user.id;
+    // 3. Get the updated contact info from the form body
+    const { name, phone, address, email } = req.body;
+
+    // --- Update the user's main profile with the latest info (optional but good practice) ---
+    // await prisma.user.update({
+    //   where: { id: userId },
+    //   data: { name, phoneNumber, address, email },
+    // });
+
+    // --- Use a transaction to create the booking ---
+    const newOwnership = await prisma.$transaction(async (tx) => {
+      // Find the car to ensure it exists and is available
+      const car = await tx.car.findUnique({
+        where: { id: parseInt(carId) },
+      });
+
+      if (!car) throw new Error("Car not found.");
+      if (car.status !== "AVAILABLE")
+        throw new Error("This car is not available for booking.");
+
+      // Check if the user has already booked this car
+      const existingBooking = await tx.carOwnership.findUnique({
+        where: { userId_carId: { userId, carId: parseInt(carId) } },
+      });
+      if (existingBooking)
+        throw new Error("You have already registered interest in this car.");
+
+      // Create the record in the CarOwnership table
+      const ownership = await tx.carOwnership.create({
+        data: {
+          userId: userId, // Use the ID from the token
+          carId: parseInt(carId),
+          // 'status' defaults to PENDING as per your schema
+        },
+      });
+
+      // Update the car's status to RESERVED
+      await tx.car.update({
+        where: { id: parseInt(carId) },
+        data: { status: "RESERVED" },
+      });
+
+      return ownership;
+    });
+
+    res.status(201).json({
+      message: "Booking successful! Your request is pending review.",
+      booking: newOwnership,
+    });
+  } catch (error) {
+    console.error("Failed to book car:", error);
+    if (error.message.includes("not found"))
+      return res.status(404).json({ message: error.message });
+    if (
+      error.message.includes("not available") ||
+      error.message.includes("already registered")
+    ) {
+      return res.status(409).json({ message: error.message }); // 409 Conflict
+    }
+    res.status(500).json({ message: "Unable to process booking request." });
+  }
+};
+
 exports.deleteCar = async (req, res) => {
   const { id } = req.params;
   try {
