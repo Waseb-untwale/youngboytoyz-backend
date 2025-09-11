@@ -4,7 +4,7 @@ exports.createBike = async (req, res) => {
   try {
     const {
       title,
-      listedBy,
+      dealerId, // Added dealerId from the schema
       registrationYear,
       kmsDriven,
       ownerCount,
@@ -19,10 +19,12 @@ exports.createBike = async (req, res) => {
       insurance,
       bikeUSP,
       fuelType,
+      status, // Added status from the schema
     } = req.body;
 
     const files = req.files;
 
+    // Handle multiple bike images and a single thumbnail
     const bikeImages = [];
     if (files && files.bikeImages) {
       if (Array.isArray(files.bikeImages)) {
@@ -32,24 +34,27 @@ exports.createBike = async (req, res) => {
       }
     }
 
-    let processedBadges = [];
-    if (badges) {
-      if (Array.isArray(badges)) {
-        processedBadges = badges;
-      } else {
-        processedBadges = [badges];
-      }
+    let thumbnail = null;
+    if (files && files.thumbnail && files.thumbnail[0]) {
+      thumbnail = files.thumbnail[0].path;
     }
+
+    // Process badges, ensuring it's an array of strings
+    const processedBadges = Array.isArray(badges)
+      ? badges
+      : badges
+      ? [badges]
+      : [];
 
     const bike = await prisma.bike.create({
       data: {
         title,
-        listedBy,
+        dealerId: parseInt(dealerId), // Parse dealerId to an integer
         registrationYear: parseInt(registrationYear),
         kmsDriven: parseInt(kmsDriven),
         ownerCount: parseInt(ownerCount),
         registrationNumber,
-        vipNumber: vipNumber === "true" ? true : false,
+        vipNumber: vipNumber === "true" || vipNumber === true, // Handle boolean from form-data or JSON
         sellingPrice: parseFloat(sellingPrice),
         cutOffPrice: parseFloat(cutOffPrice),
         ybtPrice: parseFloat(ybtPrice),
@@ -60,11 +65,15 @@ exports.createBike = async (req, res) => {
         bikeUSP,
         fuelType,
         bikeImages,
+        thumbnail, // Added thumbnail field
+        status, // Added status field
       },
     });
 
     res.status(201).json(bike);
   } catch (error) {
+    // Improved error handling to provide more specific messages
+    console.error("Error creating bike:", error);
     res.status(400).json({ error: error.message });
   }
 };
@@ -72,34 +81,64 @@ exports.createBike = async (req, res) => {
 // Get all bikes
 exports.getAllBikes = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
-    const cursor = req.query.cursor ? JSON.parse(req.query.cursor) : undefined;
+    const {
+      limit = 10,
+      cursor,
+      searchTerm,
+      brands,
+      sortBy = "newest",
+      minPrice,
+      maxPrice,
+      minYear,
+      maxYear,
+      fuelType,
+      status, // Added status as a filter
+    } = req.query;
 
-    const { searchTerm, brands, sortBy = "newest" } = req.query;
-
+    const take = parseInt(limit);
     const where = {};
 
+    // Filtering logic
     if (searchTerm) {
       where.OR = [
         { title: { contains: searchTerm, mode: "insensitive" } },
         { description: { contains: searchTerm, mode: "insensitive" } },
       ];
     }
-
     if (brands) {
-      const brandList = brands.split(",");
-      if (brandList.length > 0) {
-        where.brand = { in: brandList };
-      }
+      where.brand = { in: brands.split(",") };
+    }
+    if (minPrice || maxPrice) {
+      where.sellingPrice = {};
+      if (minPrice) where.sellingPrice.gte = parseFloat(minPrice);
+      if (maxPrice) where.sellingPrice.lte = parseFloat(maxPrice);
+    }
+    if (minYear || maxYear) {
+      where.registrationYear = {};
+      if (minYear) where.registrationYear.gte = parseInt(minYear);
+      if (maxYear) where.registrationYear.lte = parseInt(maxYear);
+    }
+    if (fuelType) {
+      where.fuelType = fuelType;
+    }
+    if (status) {
+      where.status = status;
     }
 
+    // Sorting logic
     let orderBy;
     switch (sortBy) {
-      case "name_asc":
-        orderBy = { title: "asc" };
+      case "price_asc":
+        orderBy = { sellingPrice: "asc" };
         break;
-      case "name_desc":
-        orderBy = { title: "desc" };
+      case "price_desc":
+        orderBy = { sellingPrice: "desc" };
+        break;
+      case "year_asc":
+        orderBy = { registrationYear: "asc" };
+        break;
+      case "year_desc":
+        orderBy = { registrationYear: "desc" };
         break;
       case "oldest":
         orderBy = [{ createdAt: "asc" }, { id: "asc" }];
@@ -111,7 +150,7 @@ exports.getAllBikes = async (req, res) => {
     }
 
     const prismaQueryOptions = {
-      take: limit,
+      take,
       where,
       orderBy,
       select: {
@@ -121,29 +160,27 @@ exports.getAllBikes = async (req, res) => {
         brand: true,
         badges: true,
         thumbnail: true,
+        sellingPrice: true, // Added sellingPrice to the select for sorting/filtering
         createdAt: true,
+        status: true, // Added status
       },
     };
 
-    if (cursor && (sortBy === "newest" || sortBy === "oldest")) {
-      prismaQueryOptions.cursor = {
-        createdAt_id: {
-          createdAt: new Date(cursor.createdAt),
-          id: cursor.id,
-        },
-      };
+    if (cursor) {
+      // Corrected cursor logic for better pagination
       prismaQueryOptions.skip = 1;
+      const parsedCursor = JSON.parse(cursor);
+      prismaQueryOptions.cursor = {
+        id: parsedCursor.id,
+      };
     }
 
     const bikes = await prisma.bike.findMany(prismaQueryOptions);
 
     let nextCursor = null;
-    if (bikes.length === limit) {
+    if (bikes.length === take) {
       const lastBike = bikes[bikes.length - 1];
-      nextCursor = JSON.stringify({
-        createdAt: lastBike.createdAt,
-        id: lastBike.id,
-      });
+      nextCursor = JSON.stringify({ id: lastBike.id });
     }
 
     res.json({
@@ -151,11 +188,10 @@ exports.getAllBikes = async (req, res) => {
       nextCursor,
     });
   } catch (error) {
-    console.error("Error in getAllCars:", error);
+    console.error("Error getting all bikes:", error);
     res.status(500).json({ error: error.message });
   }
 };
-
 exports.getBikeById = async (req, res) => {
   try {
     const bike = await prisma.bike.findUnique({
@@ -164,18 +200,63 @@ exports.getBikeById = async (req, res) => {
     if (!bike) return res.status(404).json({ error: "Bike not found" });
     res.json(bike);
   } catch (error) {
+    console.error("Error getting bike by ID:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.updateBike = async (req, res) => {
   try {
+    const { id } = req.params;
+    const {
+      badges,
+      vipNumber,
+      sellingPrice,
+      cutOffPrice,
+      ybtPrice,
+      ...otherData
+    } = req.body;
+    const files = req.files;
+
+    const dataToUpdate = { ...otherData };
+
+    // Handle files for update (optional)
+    if (files && files.bikeImages) {
+      dataToUpdate.bikeImages = Array.isArray(files.bikeImages)
+        ? files.bikeImages.map((file) => file.path)
+        : [files.bikeImages.path];
+    }
+    if (files && files.thumbnail && files.thumbnail[0]) {
+      dataToUpdate.thumbnail = files.thumbnail[0].path;
+    }
+
+    // Process badges for update
+    if (badges) {
+      dataToUpdate.badges = Array.isArray(badges) ? badges : [badges];
+    }
+
+    // Convert string inputs from form-data to their correct types
+    if (vipNumber !== undefined) {
+      dataToUpdate.vipNumber = vipNumber === "true" || vipNumber === true;
+    }
+    if (sellingPrice) {
+      dataToUpdate.sellingPrice = parseFloat(sellingPrice);
+    }
+    if (cutOffPrice) {
+      dataToUpdate.cutOffPrice = parseFloat(cutOffPrice);
+    }
+    if (ybtPrice) {
+      dataToUpdate.ybtPrice = parseFloat(ybtPrice);
+    }
+
     const updatedBike = await prisma.bike.update({
-      where: { id: parseInt(req.params.id) },
-      data: req.body,
+      where: { id: parseInt(id) },
+      data: dataToUpdate,
     });
+
     res.json(updatedBike);
   } catch (error) {
+    console.error("Error updating bike:", error);
     res.status(400).json({ error: error.message });
   }
 };
@@ -188,6 +269,7 @@ exports.deleteBike = async (req, res) => {
     });
     res.json({ message: "Bike deleted" });
   } catch (error) {
+    console.error("Error deleting bike:", error);
     res.status(500).json({ error: error.message });
   }
 };
