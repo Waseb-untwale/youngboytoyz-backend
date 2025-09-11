@@ -34,11 +34,6 @@ exports.createBike = async (req, res) => {
       }
     }
 
-    let thumbnail = null;
-    if (files && files.thumbnail && files.thumbnail[0]) {
-      thumbnail = files.thumbnail[0].path;
-    }
-
     // Process badges, ensuring it's an array of strings
     const processedBadges = Array.isArray(badges)
       ? badges
@@ -66,7 +61,7 @@ exports.createBike = async (req, res) => {
         fuelType,
         bikeImages,
         thumbnail:
-          carImages[0] ||
+          bikeImages[0] ||
           "https://placehold.co/800x600/EFEFEF/AAAAAA?text=Image+Not+Available", // Added thumbnail field
         status, // Added status field
       },
