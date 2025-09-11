@@ -1,6 +1,19 @@
 {
   "name": "young-boyz-toyz-backend",
   "version": "1.0.0",
+  "description": "",
+  "keywords": [],
+  "homepage": "https://github.com/Waseb-untwale/youngboytoyz-backend#readme",
+  "bugs": {
+    "url": "https://github.com/Waseb-untwale/youngboytoyz-backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Waseb-untwale/youngboytoyz-backend.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,10 +22,6 @@
     "seedbike": "node prisma/seedBike.js",
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "@prisma/client": "^6.14.0",
     "bcrypt": "^6.0.0",
