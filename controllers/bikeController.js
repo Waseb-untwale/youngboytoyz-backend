@@ -65,7 +65,9 @@ exports.createBike = async (req, res) => {
         bikeUSP,
         fuelType,
         bikeImages,
-        thumbnail, // Added thumbnail field
+        thumbnail:
+          carImages[0] ||
+          "https://placehold.co/800x600/EFEFEF/AAAAAA?text=Image+Not+Available", // Added thumbnail field
         status, // Added status field
       },
     });
@@ -192,10 +194,14 @@ exports.getAllBikes = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 exports.getBikeById = async (req, res) => {
   try {
     const bike = await prisma.bike.findUnique({
       where: { id: parseInt(req.params.id) },
+      include: {
+        dealer: true,
+      },
     });
     if (!bike) return res.status(404).json({ error: "Bike not found" });
     res.json(bike);

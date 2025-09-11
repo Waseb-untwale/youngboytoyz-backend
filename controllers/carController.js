@@ -1,5 +1,4 @@
 const prisma = require("../utils/prisma");
-const createSlug = require("../utils/slugify");
 const redis = require("../utils/redis");
 
 const clearListCaches = async () => {
@@ -55,8 +54,6 @@ exports.createCar = async (req, res) => {
       return res.status(400).json({ message: "A dealerId is required." });
     }
 
-    const slug = createSlug(`${brand} ${title}`);
-
     const files = req.files;
 
     const carImages = [];
@@ -99,7 +96,6 @@ exports.createCar = async (req, res) => {
         insurance,
         badges: processedBadges,
         description,
-        slug,
         brand,
         carUSP,
         carType,
@@ -281,6 +277,7 @@ exports.getCarById = async (req, res) => {
       where: { id: parseInt(id) },
       include: {
         dealer: true,
+        ownerships: true,
       },
     });
 

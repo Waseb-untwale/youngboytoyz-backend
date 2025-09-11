@@ -106,14 +106,12 @@ model Car {
   ownerCount         Int
   insurance          String?
 
-  dealerId  Int // Foreign key to Dealer
-  dealer    Dealer   @relation(fields: [dealerId], references: [id])
-  badges    String[]
-  vipNumber Boolean  @default(false)
-  city      String?
-  state     String?
-  slug      String?  @unique
-
+  dealerId        Int // Foreign key to Dealer
+  dealer          Dealer     @relation(fields: [dealerId], references: [id])
+  badges          String[]
+  vipNumber       Boolean    @default(false)
+  city            String?
+  state           String?
   brand           String?
   carUSP          String?
   carType         String?
