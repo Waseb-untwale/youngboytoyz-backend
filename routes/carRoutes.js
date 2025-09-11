@@ -32,7 +32,6 @@ const carValidationRules = [
 router.post(
   "/",
   upload.fields([{ name: "carImages", maxCount: 10 }]),
-  carValidationRules,
   carController.createCar
 );
 router.get("/", carController.getAllCars);

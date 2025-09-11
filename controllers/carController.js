@@ -4,11 +4,11 @@ const redis = require("../utils/redis");
 
 const clearListCaches = async () => {
   console.log("Clearing list caches...");
-  const keys = await redis.keys("cars:all:*"); // Find all keys for getAllCars
+  const keys = await redis.sendCommand(["KEYS", "cars:all:*"]);
   if (keys.length > 0) {
-    await redis.del(keys); // Delete them
+    await redis.del(keys);
   }
-  await redis.del("cars:total"); // Delete the total count
+  await redis.del("cars:total");
 };
 
 // Create a new car
