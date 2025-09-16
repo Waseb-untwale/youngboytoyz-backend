@@ -90,10 +90,10 @@ model Dealer {
 }
 
 model Car {
-  id          Int           @id @default(autoincrement())
+  id          Int            @id @default(autoincrement())
   title       String
   description String?
-  status      VehicleStatus @default(AVAILABLE)
+  status      VehicleStatus? @default(AVAILABLE)
 
   sellingPrice Float
   cutOffPrice  Float
@@ -103,7 +103,7 @@ model Car {
   registrationNumber String  @unique
   manufactureYear    Int?
   kmsDriven          Int
-  ownerCount         Int
+  ownerCount         Int?
   insurance          String?
 
   dealerId        Int // Foreign key to Dealer
@@ -178,6 +178,7 @@ model Bike {
   @@index([brand])
   @@index([status])
   @@index([dealerId])
+  @@index([createdAt, id])
 }
 
 // Car ownership tracking
@@ -243,9 +244,9 @@ model BookingLead {
 }
 
 model Event {
-  id               String   @id @default(cuid())
+  id               Int          @id @default(autoincrement())
   title            String
-  slug             String   @unique
+  slug             String       @unique
   description      String?
   maxAttendees     Int?
   currentAttendees Int
@@ -254,8 +255,18 @@ model Event {
   endDate          DateTime
   imageUrls        String[]
   primaryImage     String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  agenda           AgendaItem[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@map("events")
+}
+
+model AgendaItem {
+  id          Int     @id @default(autoincrement())
+  time        String
+  title       String
+  description String?
+  event       Event   @relation(fields: [eventId], references: [id])
+  eventId     Int
 }

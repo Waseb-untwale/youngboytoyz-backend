@@ -77,6 +77,7 @@ exports.createBike = async (req, res) => {
 
 // Get all bikes
 exports.getAllBikes = async (req, res) => {
+  const start = Date.now();
   try {
     const {
       limit = 10,
@@ -89,13 +90,12 @@ exports.getAllBikes = async (req, res) => {
       minYear,
       maxYear,
       fuelType,
-      status, // Added status as a filter
+      status,
     } = req.query;
 
     const take = parseInt(limit);
     const where = {};
 
-    // Filtering logic
     if (searchTerm) {
       where.OR = [
         { title: { contains: searchTerm, mode: "insensitive" } },
@@ -122,7 +122,6 @@ exports.getAllBikes = async (req, res) => {
       where.status = status;
     }
 
-    // Sorting logic
     let orderBy;
     switch (sortBy) {
       case "price_asc":
@@ -153,26 +152,23 @@ exports.getAllBikes = async (req, res) => {
       select: {
         id: true,
         title: true,
-        description: true,
         brand: true,
         badges: true,
+        ybtPrice: true,
         thumbnail: true,
-        sellingPrice: true, // Added sellingPrice to the select for sorting/filtering
         createdAt: true,
-        status: true, // Added status
       },
     };
 
     if (cursor) {
-      // Corrected cursor logic for better pagination
       prismaQueryOptions.skip = 1;
       const parsedCursor = JSON.parse(cursor);
-      prismaQueryOptions.cursor = {
-        id: parsedCursor.id,
-      };
+      prismaQueryOptions.cursor = { id: parsedCursor.id };
     }
 
+    const dbStart = Date.now();
     const bikes = await prisma.bike.findMany(prismaQueryOptions);
+    const dbDuration = Date.now() - dbStart;
 
     let nextCursor = null;
     if (bikes.length === take) {
@@ -180,9 +176,15 @@ exports.getAllBikes = async (req, res) => {
       nextCursor = JSON.stringify({ id: lastBike.id });
     }
 
+    const totalDuration = Date.now() - start;
+    console.timeEnd("getAllBikes");
+    console.log(`DB query took: ${dbDuration}ms`);
+    console.log(`Total request took: ${totalDuration}ms`);
+
     res.json({
       data: bikes,
       nextCursor,
+      timings: { dbDuration, totalDuration },
     });
   } catch (error) {
     console.error("Error getting all bikes:", error);
@@ -221,7 +223,6 @@ exports.updateBike = async (req, res) => {
 
     const dataToUpdate = { ...otherData };
 
-    // Handle files for update (optional)
     if (files && files.bikeImages) {
       dataToUpdate.bikeImages = Array.isArray(files.bikeImages)
         ? files.bikeImages.map((file) => file.path)
@@ -231,12 +232,10 @@ exports.updateBike = async (req, res) => {
       dataToUpdate.thumbnail = files.thumbnail[0].path;
     }
 
-    // Process badges for update
     if (badges) {
       dataToUpdate.badges = Array.isArray(badges) ? badges : [badges];
     }
 
-    // Convert string inputs from form-data to their correct types
     if (vipNumber !== undefined) {
       dataToUpdate.vipNumber = vipNumber === "true" || vipNumber === true;
     }
@@ -262,7 +261,6 @@ exports.updateBike = async (req, res) => {
   }
 };
 
-// Delete a bike
 exports.deleteBike = async (req, res) => {
   try {
     await prisma.bike.delete({

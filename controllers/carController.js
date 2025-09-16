@@ -199,9 +199,9 @@ exports.getAllCars = async (req, res) => {
         // Selecting only necessary fields
         id: true,
         title: true,
-        description: true,
         brand: true,
         badges: true,
+        ybtPrice: true,
         thumbnail: true, // Assuming this is the relation/field name
         createdAt: true, // Needed for cursor
       },
@@ -293,9 +293,38 @@ exports.getCarById = async (req, res) => {
 exports.updateCar = async (req, res) => {
   const { id } = req.params;
   try {
+    let updateData = req.body;
+    const files = req.files;
+
+    if (files && files.carImages) {
+      const newCarImages = [];
+      if (Array.isArray(files.carImages)) {
+        newCarImages.push(...files.carImages.map((file) => file.path));
+      } else {
+        newCarImages.push(files.carImages.path);
+      }
+
+      const existingCar = await prisma.car.findUnique({
+        where: { id: parseInt(id) },
+        select: { carImages: true },
+      });
+
+      updateData.carImages = [
+        ...(existingCar?.carImages || []),
+        ...newCarImages,
+      ];
+    }
+
+    if (updateData.dealerId) {
+      updateData.dealerId = parseInt(updateData.dealerId);
+    }
+    if (updateData.kmsDriven) {
+      updateData.kmsDriven = parseInt(updateData.kmsDriven);
+    }
+
     const updatedCar = await prisma.car.update({
-      where: { id: parseInt(req.params.id) },
-      data: req.body,
+      where: { id: parseInt(id) },
+      data: updateData,
     });
 
     await clearListCaches();

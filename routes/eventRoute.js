@@ -10,11 +10,14 @@ router.post(
   eventController.createEvent
 );
 
-router.get("/", protect, admin, eventController.getallEvents);
+router.get("/", eventController.getallEvents);
+
 router.get(
   "/totaleventscount",
   protect,
   admin,
   eventController.getTotalEventsCount
 );
+
+router.get("/:id", eventController.getEventbyId);
 module.exports = router;
