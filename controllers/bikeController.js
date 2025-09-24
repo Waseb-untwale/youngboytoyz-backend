@@ -1,209 +1,58 @@
-const prisma = require("../utils/prisma");
+const bikeService = require("../services/bikeService");
 
 exports.createBike = async (req, res) => {
   try {
-    const {
-      title,
-      dealerId, // Added dealerId from the schema
-      registrationYear,
-      kmsDriven,
-      ownerCount,
-      badges,
-      description,
-      brand,
-      registrationNumber,
-      vipNumber,
-      sellingPrice,
-      cutOffPrice,
-      ybtPrice,
-      insurance,
-      bikeUSP,
-      fuelType,
-      status, // Added status from the schema
-    } = req.body;
-
-    const files = req.files;
-
-    // Handle multiple bike images and a single thumbnail
-    const bikeImages = [];
-    if (files && files.bikeImages) {
-      if (Array.isArray(files.bikeImages)) {
-        bikeImages.push(...files.bikeImages.map((file) => file.path));
-      } else {
-        bikeImages.push(files.bikeImages.path);
-      }
+    if (
+      !req.files ||
+      !req.files.bikeImages ||
+      req.files.bikeImages.length === 0
+    ) {
+      return res.status(400).json({
+        errors: [{ message: "At least one bike image is required." }],
+      });
     }
 
-    // Process badges, ensuring it's an array of strings
-    const processedBadges = Array.isArray(badges)
-      ? badges
-      : badges
-      ? [badges]
-      : [];
-
-    const bike = await prisma.bike.create({
-      data: {
-        title,
-        dealerId: parseInt(dealerId), // Parse dealerId to an integer
-        registrationYear: parseInt(registrationYear),
-        kmsDriven: parseInt(kmsDriven),
-        ownerCount: parseInt(ownerCount),
-        registrationNumber,
-        vipNumber: vipNumber === "true" || vipNumber === true, // Handle boolean from form-data or JSON
-        sellingPrice: parseFloat(sellingPrice),
-        cutOffPrice: parseFloat(cutOffPrice),
-        ybtPrice: parseFloat(ybtPrice),
-        insurance,
-        badges: processedBadges,
-        description,
-        brand,
-        bikeUSP,
-        fuelType,
-        bikeImages,
-        thumbnail:
-          bikeImages[0] ||
-          "https://placehold.co/800x600/EFEFEF/AAAAAA?text=Image+Not+Available", // Added thumbnail field
-        status, // Added status field
-      },
-    });
-
-    res.status(201).json(bike);
+    const newBike = await bikeService.createBike(req.body, req.files);
+    res.status(201).json(newBike);
   } catch (error) {
-    // Improved error handling to provide more specific messages
-    console.error("Error creating bike:", error);
-    res.status(400).json({ error: error.message });
+    console.error("💥 FAILED TO CREATE BIKE:", error);
+    res.status(500).json({
+      message: "Failed to create bike.",
+      error: error.message,
+    });
   }
 };
 
-// Get all bikes
 exports.getAllBikes = async (req, res) => {
-  const start = Date.now();
   try {
-    const {
-      limit = 10,
-      cursor,
-      searchTerm,
-      brands,
-      sortBy = "newest",
-      minPrice,
-      maxPrice,
-      minYear,
-      maxYear,
-      fuelType,
-      status,
-    } = req.query;
-
-    const take = parseInt(limit);
-    const where = {};
-
-    if (searchTerm) {
-      where.OR = [
-        { title: { contains: searchTerm, mode: "insensitive" } },
-        { description: { contains: searchTerm, mode: "insensitive" } },
-      ];
-    }
-    if (brands) {
-      where.brand = { in: brands.split(",") };
-    }
-    if (minPrice || maxPrice) {
-      where.sellingPrice = {};
-      if (minPrice) where.sellingPrice.gte = parseFloat(minPrice);
-      if (maxPrice) where.sellingPrice.lte = parseFloat(maxPrice);
-    }
-    if (minYear || maxYear) {
-      where.registrationYear = {};
-      if (minYear) where.registrationYear.gte = parseInt(minYear);
-      if (maxYear) where.registrationYear.lte = parseInt(maxYear);
-    }
-    if (fuelType) {
-      where.fuelType = fuelType;
-    }
-    if (status) {
-      where.status = status;
-    }
-
-    let orderBy;
-    switch (sortBy) {
-      case "price_asc":
-        orderBy = { sellingPrice: "asc" };
-        break;
-      case "price_desc":
-        orderBy = { sellingPrice: "desc" };
-        break;
-      case "year_asc":
-        orderBy = { registrationYear: "asc" };
-        break;
-      case "year_desc":
-        orderBy = { registrationYear: "desc" };
-        break;
-      case "oldest":
-        orderBy = [{ createdAt: "asc" }, { id: "asc" }];
-        break;
-      case "newest":
-      default:
-        orderBy = [{ createdAt: "desc" }, { id: "desc" }];
-        break;
-    }
-
-    const prismaQueryOptions = {
-      take,
-      where,
-      orderBy,
-      select: {
-        id: true,
-        title: true,
-        brand: true,
-        badges: true,
-        ybtPrice: true,
-        thumbnail: true,
-        createdAt: true,
-      },
-    };
-
-    if (cursor) {
-      prismaQueryOptions.skip = 1;
-      const parsedCursor = JSON.parse(cursor);
-      prismaQueryOptions.cursor = { id: parsedCursor.id };
-    }
-
-    const dbStart = Date.now();
-    const bikes = await prisma.bike.findMany(prismaQueryOptions);
-    const dbDuration = Date.now() - dbStart;
-
-    let nextCursor = null;
-    if (bikes.length === take) {
-      const lastBike = bikes[bikes.length - 1];
-      nextCursor = JSON.stringify({ id: lastBike.id });
-    }
-
-    const totalDuration = Date.now() - start;
-    console.timeEnd("getAllBikes");
-    console.log(`DB query took: ${dbDuration}ms`);
-    console.log(`Total request took: ${totalDuration}ms`);
-
-    res.json({
-      data: bikes,
-      nextCursor,
-      timings: { dbDuration, totalDuration },
-    });
+    const responseData = await bikeService.getAllBikes(req.query);
+    res.status(200).json(responseData);
   } catch (error) {
-    console.error("Error getting all bikes:", error);
+    console.error("❌ Error in getAllBikes controller:", error);
+    res.status(500).json({ error: "Failed to fetch bikes" });
+  }
+};
+
+exports.getTotalBikes = async (req, res) => {
+  try {
+    const total = await bikeService.getTotalBikes();
+    res.status(200).json({ total });
+  } catch (error) {
+    console.error("Failed to get total bikes:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.getBikeById = async (req, res) => {
   try {
-    const bike = await prisma.bike.findUnique({
-      where: { id: parseInt(req.params.id) },
-      include: {
-        dealer: true,
-      },
-    });
+    const { id } = req.params;
+
+    const bike = await bikeService.getBikeById(id);
+
     if (!bike) return res.status(404).json({ error: "Bike not found" });
-    res.json(bike);
+    res.status(200).json(bike);
   } catch (error) {
-    console.error("Error getting bike by ID:", error);
+    console.error(`Failed to get bike ${req.params.id}:`, error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -211,64 +60,172 @@ exports.getBikeById = async (req, res) => {
 exports.updateBike = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      badges,
-      vipNumber,
-      sellingPrice,
-      cutOffPrice,
-      ybtPrice,
-      ...otherData
-    } = req.body;
-    const files = req.files;
-
-    const dataToUpdate = { ...otherData };
-
-    if (files && files.bikeImages) {
-      dataToUpdate.bikeImages = Array.isArray(files.bikeImages)
-        ? files.bikeImages.map((file) => file.path)
-        : [files.bikeImages.path];
-    }
-    if (files && files.thumbnail && files.thumbnail[0]) {
-      dataToUpdate.thumbnail = files.thumbnail[0].path;
-    }
-
-    if (badges) {
-      dataToUpdate.badges = Array.isArray(badges) ? badges : [badges];
-    }
-
-    if (vipNumber !== undefined) {
-      dataToUpdate.vipNumber = vipNumber === "true" || vipNumber === true;
-    }
-    if (sellingPrice) {
-      dataToUpdate.sellingPrice = parseFloat(sellingPrice);
-    }
-    if (cutOffPrice) {
-      dataToUpdate.cutOffPrice = parseFloat(cutOffPrice);
-    }
-    if (ybtPrice) {
-      dataToUpdate.ybtPrice = parseFloat(ybtPrice);
-    }
-
-    const updatedBike = await prisma.bike.update({
-      where: { id: parseInt(id) },
-      data: dataToUpdate,
-    });
-
-    res.json(updatedBike);
+    const updatedBike = await bikeService.updateBike(id, req.body, req.files);
+    res.status(200).json(updatedBike);
   } catch (error) {
-    console.error("Error updating bike:", error);
+    console.error(`Error updating bike ${req.params.id}:`, error);
     res.status(400).json({ error: error.message });
   }
 };
 
 exports.deleteBike = async (req, res) => {
   try {
-    await prisma.bike.delete({
-      where: { id: parseInt(req.params.id) },
+    const bikeId = parseInt(req.params.id, 10);
+    if (isNaN(bikeId)) {
+      return res.status(400).json({ error: "Invalid bike ID provided." });
+    }
+
+    const deleteBike = await bikeService.deleteBikeById(bikeId);
+    res.status(200).json({
+      message: "Bike deleted successfully.",
+      deletedId: deleteBike.id,
     });
-    res.json({ message: "Bike deleted" });
   } catch (error) {
     console.error("Error deleting bike:", error);
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Bike not found." });
+    }
     res.status(500).json({ error: error.message });
   }
 };
+
+// const generateCacheKey = (query) => {
+//   const { limit, cursor, searchTerm, brands, sortBy } = query;
+//   const keyObj = { limit: parseInt(limit) || 10, sortBy: sortBy || "newest" };
+
+//   if (cursor) keyObj.cursor = cursor;
+//   if (searchTerm) keyObj.search = searchTerm.toLowerCase();
+//   if (brands) keyObj.brands = brands.split(",").sort().join(",");
+
+//   return `bikes:list:${Buffer.from(JSON.stringify(keyObj)).toString("base64")}`;
+// };
+
+// const buildCursor = (bike, sortBy) => {
+//   if (sortBy === "name_asc" || sortBy === "name_desc") {
+//     return { title: bike.title, id: bike.id };
+//   }
+//   return { createdAt: bike.createdAt, id: bike.id };
+// };
+
+// const buildPrismaCursor = (cursor, sortBy) => {
+//   const parsedCursor = JSON.parse(cursor);
+//   if (sortBy === "name_asc" || sortBy === "name_desc") {
+//     return {
+//       title_id: {
+//         title: parsedCursor.title,
+//         id: parsedCursor.id,
+//       },
+//     };
+//   }
+//   return {
+//     createdAt_id: {
+//       createdAt: new Date(parsedCursor.createdAt),
+//       id: parsedCursor.id,
+//     },
+//   };
+// };
+
+// exports.createBike = async (req, res) => {
+//   try {
+//     const {
+//       title,
+//       dealerId,
+//       ybtPrice,
+//       registrationNumber,
+//       registrationYear,
+//       kmsDriven,
+//       ownerCount,
+//       badges,
+//       description,
+//       brand,
+//       vipNumber,
+//       sellingPrice,
+//       cutOffPrice,
+//       insurance,
+//       bikeUSP,
+//       fuelType,
+//       status,
+//       specs,
+//       engine,
+//     } = req.body;
+
+//     // --- Basic Validation ---
+//     if (
+//       !title ||
+//       !dealerId ||
+//       !ybtPrice ||
+//       !registrationNumber ||
+//       !registrationYear ||
+//       !kmsDriven
+//     ) {
+//       return res.status(400).json({
+//         message:
+//           "Title, Dealer, YBT Price, Registration Number, Year, and Kms Driven are required.",
+//       });
+//     }
+
+//     const files = req.files;
+//     const bikeImages = [];
+//     if (files && files.bikeImages) {
+//       if (Array.isArray(files.bikeImages)) {
+//         bikeImages.push(...files.bikeImages.map((file) => file.path));
+//       } else {
+//         bikeImages.push(files.bikeImages.path);
+//       }
+//     }
+
+//     const processArrayField = (field) => {
+//       if (!field) return [];
+//       return Array.isArray(field) ? field : [field];
+//     };
+//     const processedBadges = processArrayField(badges);
+//     const processedSpecs = processArrayField(specs);
+
+//     // --- Create Bike in Database ---
+//     const bike = await prisma.bike.create({
+//       data: {
+//         title,
+//         registrationNumber,
+//         insurance,
+//         description,
+//         brand,
+//         bikeUSP,
+//         engine,
+//         specs: processedSpecs,
+//         badges: processedBadges,
+//         bikeImages,
+//         thumbnail:
+//           bikeImages[0] || "https://placehold.co/800x600?text=No+Image",
+//         vipNumber: vipNumber === "true",
+
+//         // --- Correctly Parsed Numbers and Enums ---
+//         dealerId: parseInt(dealerId),
+//         ybtPrice: parseFloat(ybtPrice),
+//         registrationYear: parseInt(registrationYear),
+//         kmsDriven: parseInt(kmsDriven),
+
+//         // Safely parse optional number fields
+//         ownerCount: ownerCount ? parseInt(ownerCount) : null,
+//         sellingPrice: sellingPrice ? parseFloat(sellingPrice) : null,
+//         cutOffPrice: cutOffPrice ? parseFloat(cutOffPrice) : null,
+
+//         // Let the schema's default handle these if not provided
+//         status: status ? status.toUpperCase() : undefined,
+//         fuelType: fuelType ? fuelType.toUpperCase() : undefined,
+//       },
+//     });
+
+//     res.status(201).json(bike);
+//   } catch (error) {
+//     console.error("💥 FAILED TO CREATE BIKE:", error);
+//     if (error.code === "P2002") {
+//       return res.status(409).json({
+//         message: "A bike with this registration number already exists.",
+//       });
+//     }
+//     res.status(500).json({
+//       message: "Failed to create bike.",
+//       error: error.message,
+//     });
+//   }
+// };
