@@ -150,10 +150,10 @@ exports.getAllCars = async (queryParams) => {
   }
 
   const orderByMap = {
-    name_asc: { title: "asc" },
-    name_desc: { title: "desc" },
-    oldest: { createdAt: "asc" },
-    newest: { createdAt: "desc" },
+    name_asc: [{ title: "asc" }, { id: "asc" }],
+    name_desc: [{ title: "desc" }, { id: "asc" }],
+    oldest: [{ createdAt: "asc" }, { id: "asc" }],
+    newest: [{ createdAt: "desc" }, { id: "desc" }],
   };
   const orderBy = orderByMap[sortBy] || orderByMap.newest;
 
@@ -167,6 +167,7 @@ exports.getAllCars = async (queryParams) => {
       brand: true,
       badges: true,
       ybtPrice: true,
+      tuningStage: true,
       thumbnail: true,
       createdAt: true,
     },
