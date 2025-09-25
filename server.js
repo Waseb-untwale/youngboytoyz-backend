@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
+// const rateLimit = require("express-rate-limit");
 
 const prisma = require("./utils/prisma");
 const redis = require("./utils/redis");
@@ -23,13 +23,13 @@ app.use(express.json());
 app.use(cors());
 app.use(helmet());
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use("/api/", apiLimiter);
+// const apiLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 100,
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
+// app.use("/api/", apiLimiter);
 
 // --- Route Handlers ---
 app.use("/api/v1/users", userRoutes);
