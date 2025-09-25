@@ -13,6 +13,7 @@
 // // --- Data Pools for Seeding ---
 // const badgePool = [
 //   "LOW_KMS",
+//   "PREMIUM",
 //   "RARE_FIND",
 //   "MINT_CONDITION",
 //   "CUSTOM_BUILD",
@@ -27,10 +28,10 @@
 
 //   // 1. CLEAR DATABASE
 //   console.log("🗑️  Clearing previous data...");
-//   await prisma.car.deleteMany({});
-//   await prisma.workshop.deleteMany({});
-//   await prisma.designer.deleteMany({});
-//   await prisma.dealer.deleteMany({});
+//   // await prisma.car.deleteMany({});
+//   // await prisma.workshop.deleteMany({});
+//   // await prisma.designer.deleteMany({});
+//   // await prisma.dealer.deleteMany({});
 
 //   // 2. SEED DEALERS
 //   console.log("🤵 Seeding Dealers...");
@@ -62,7 +63,11 @@
 //       title: faker.person.jobTitle(),
 //       description: faker.lorem.paragraph(),
 //       image: faker.image.avatar(),
-//       stats: { projects: faker.number.int({ min: 10, max: 150 }) },
+//       stats: {
+//         projects: faker.number.int({ min: 10, max: 150 }),
+//         experience: faker.number.int({ min: 10, max: 25 }),
+//         awards: faker.number.int({ min: 5, max: 15 }),
+//       },
 //     });
 //   }
 //   await prisma.designer.createMany({ data: designersToCreate });
@@ -81,7 +86,11 @@
 //       title: "Certified Performance Center",
 //       description: faker.lorem.paragraphs(2),
 //       image: faker.image.urlLoremFlickr({ category: "technics" }),
-//       stats: { carsTuned: faker.number.int({ min: 100, max: 2000 }) },
+//       stats: {
+//         projects: faker.number.int({ min: 10, max: 150 }),
+//         experience: faker.number.int({ min: 10, max: 25 }),
+//         specialists: faker.number.int({ min: 10, max: 150 }),
+//       },
 //     });
 //   }
 //   await prisma.workshop.createMany({ data: workshopsToCreate });
@@ -91,7 +100,7 @@
 
 //   // 5. SEED CARS
 //   console.log("\n🚗 Seeding Cars with consistent data...");
-//   const numberOfCars = 50;
+//   const numberOfCars = 100;
 //   const carsToCreate = [];
 //   const carImagePool = [
 //     "https://images.unsplash.com/photo-1503376780353-7e6692767b70",
@@ -103,7 +112,7 @@
 //     const model = faker.vehicle.model();
 //     const carImages = faker.helpers.arrayElements(carImagePool, {
 //       min: 2,
-//       max: 4,
+//       max: 5,
 //     });
 
 //     // ✨ NEW: Logic to ensure collection data is consistent
@@ -162,6 +171,8 @@
 //         .toUpperCase()}${faker.string.numeric(4)}`,
 //       kmsDriven: faker.number.int({ min: 10000, max: 150000 }),
 //       brand,
+//       city: faker.location.city(),
+//       engine: `${faker.number.int({ min: 1000, max: 5000 })} cc`,
 //       thumbnail: carImages[0],
 //       carImages,
 //     };
@@ -182,7 +193,7 @@
 //     console.log("\n👋 Seeding finished. Disconnecting Prisma Client.");
 //     await prisma.$disconnect();
 //   });
-
+///////////////////////////////////////////////////////////////////////////////////
 const { PrismaClient } = require("@prisma/client");
 const { faker } = require("@faker-js/faker");
 
@@ -196,8 +207,6 @@ const badgePool = [
   "CUSTOM_BUILD",
   "ONE_OWNER",
 ];
-const tuningStagePool = ["STAGE1", "STAGE2", "STAGE3"];
-const collectionTypePool = ["YBT", "DESIGNER", "WORKSHOP", "TORQUE_TUNER"];
 const bikeBrandPool = [
   "Royal Enfield",
   "Harley-Davidson",
@@ -215,41 +224,47 @@ const bikeSpecPool = [
 ];
 const bikeImagePool = [
   "https://images.unsplash.com/photo-1558981403-c5f9899a28bc",
-  "https://images.unsplash.com/photo-1558981001-5864b3250a69",
-  "https://images.unsplash.com/photo-1660159523843-79260d36ad36",
+  "https://images.unsplash.com/photo-1625043834839-a8a5a1907a3c",
 ];
 
 // --- Main Seeding Function ---
 async function main() {
   console.log("🌱 Starting the additive seeding process for bikes...");
 
-  // 1. CLEAR ONLY BIKE DATA
-  // =============================================
-  console.log("🗑️  Clearing previous BIKE data only...");
-  await prisma.bike.deleteMany({});
+  // This script is additive. To clear bike data first, uncomment the line below:
+  // await prisma.bike.deleteMany({});
 
-  // --- The following sections are commented out to preserve existing data ---
-  /*
-  await prisma.car.deleteMany({});
-  await prisma.workshop.deleteMany({});
-  await prisma.designer.deleteMany({});
-  await prisma.dealer.deleteMany({});
-  */
-
-  // 2. FETCH EXISTING DEALERS
+  // 1. ENSURE YBT DEALER EXISTS
   // =============================================
-  console.log("🤵 Fetching existing dealers...");
-  const dealers = await prisma.dealer.findMany();
-  if (dealers.length === 0) {
-    console.error(
-      "💥 No dealers found. Please seed dealers before seeding bikes."
-    );
+  console.log("🤵 Ensuring 'YBT Superbikes' dealer exists...");
+  const ybtDealerName = "YBT";
+  // ✨ MODIFICATION: Use upsert to create the specific YBT dealer if it doesn't exist
+  await prisma.dealer.upsert({
+    where: { name: ybtDealerName },
+    update: {},
+    create: {
+      name: ybtDealerName,
+      city: "Pune",
+      state: "Maharashtra",
+      email: "contact@ybt.com",
+      phone: faker.phone.number(),
+      address: faker.location.streetAddress(),
+    },
+  });
+
+  // 2. FETCH THE YBT DEALER ID
+  // =============================================
+  const ybtDealer = await prisma.dealer.findUnique({
+    where: { name: ybtDealerName },
+  });
+
+  if (!ybtDealer) {
+    console.error("💥 Could not find or create the YBT Dealer. Exiting.");
     process.exit(1);
   }
-  const dealerIds = dealers.map((d) => d.id);
-  console.log(`✅ Found ${dealers.length} dealers to link bikes to.`);
+  console.log(`✅ Found YBT Dealer (ID: ${ybtDealer.id}) to link bikes to.`);
 
-  // 6. SEED BIKES (NEW SECTION)
+  // 3. SEED BIKES
   // =============================================
   console.log("\n🏍️  Seeding Bikes...");
   const numberOfBikes = 50;
@@ -257,64 +272,42 @@ async function main() {
 
   for (let i = 0; i < numberOfBikes; i++) {
     const brand = faker.helpers.arrayElement(bikeBrandPool);
-    const model = faker.vehicle.model(); // Using vehicle model as a generic name
+    const model = faker.vehicle.model();
     const bikeImages = faker.helpers.arrayElements(bikeImagePool, {
       min: 1,
       max: 3,
     });
 
     const bikeData = {
-      // --- Relations ---
-      dealerId: faker.helpers.arrayElement(dealerIds),
+      // ✨ MODIFICATION: Assign all bikes to the specific YBT Dealer ID
+      dealerId: ybtDealer.id,
 
       // --- Core Info ---
       title: `${brand} ${model}`,
       description: faker.lorem.paragraph(),
       status: faker.helpers.arrayElement(["AVAILABLE", "SOLD", "PENDING"]),
-      collectionType: faker.helpers.arrayElement(collectionTypePool),
+      collectionType: "YBT",
       brand,
       bikeUSP: faker.lorem.sentence(),
-
-      // --- Pricing ---
       ybtPrice: parseFloat(faker.commerce.price({ min: 80000, max: 1500000 })),
-      sellingPrice: faker.helpers.arrayElement([
-        null,
-        parseFloat(faker.commerce.price({ min: 90000, max: 1600000 })),
-      ]),
-      cutOffPrice: faker.helpers.arrayElement([
-        null,
-        parseFloat(faker.commerce.price({ min: 75000, max: 1400000 })),
-      ]),
-
-      // --- Registration & History ---
       registrationYear: faker.date.past({ years: 8 }).getFullYear(),
       registrationNumber: `MH${faker.string.numeric(2)}${faker.string
         .alpha(2)
         .toUpperCase()}${faker.string.numeric(4)}`,
       kmsDriven: faker.number.int({ min: 5000, max: 90000 }),
-      ownerCount: faker.helpers.arrayElement([1, 2, 3, null]),
-      insurance: faker.helpers.arrayElement([
-        "Comprehensive",
-        "Third Party",
-        null,
-      ]),
-
-      // --- Features & Specs ---
-      vipNumber: faker.datatype.boolean(),
       badges: faker.helpers.arrayElements(badgePool, { min: 0, max: 2 }),
       specs: faker.helpers.arrayElements(bikeSpecPool, { min: 1, max: 3 }),
       engine: `${faker.number.int({ min: 150, max: 1200 })} cc`,
-      fuelType: faker.helpers.arrayElement(["PETROL", "DIESEL", "ELECTRIC"]),
-
-      // --- Media ---
       thumbnail: bikeImages[0],
       bikeImages,
     };
     bikesToCreate.push(bikeData);
   }
 
-  await prisma.bike.createMany({ data: bikesToCreate });
-  console.log(`✅ Seeded ${bikesToCreate.length} bikes.`);
+  await prisma.bike.createMany({ data: bikesToCreate, skipDuplicates: true });
+  console.log(
+    `✅ Added ${numberOfBikes} new bikes to the database, all linked to YBT.`
+  );
 }
 
 // --- Execute the Main Function ---

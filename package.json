@@ -21,6 +21,7 @@
     "seed": "node prisma/seed.js",
     "db:reset:docker": "dotenv -e .env.docker -- prisma migrate reset",
     "db:seed:docker": "dotenv -e .env.docker -- node prisma/seed.js",
+    "studio:docker": "dotenv -e .env.docker -- prisma studio",
     "seedbike": "node prisma/seedBike.js",
     "start": "node server.js",
     "start:docker": "dotenv -e .env.docker -- node server.js"
