@@ -1,29 +1,33 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-const bcrypt = require("bcrypt");
+const userService = require("../services/userService");
 
 exports.getUsers = async (req, res) => {
   try {
-    const users = await prisma.user.findMany();
-    res.json(users);
+    const users = await userService.getUsers();
+    res.status(200).json({ success: true, data: users });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch users" });
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to fetch users" });
   }
 };
 
 exports.totalUsers = async (req, res) => {
   try {
-    const totalUsers = await prisma.user.count();
-    res.status(200).json({ totalUsers: totalUsers });
+    const totalUsers = await userService.totalUsers();
+    res.status(200).json({
+      success: true,
+      data: {
+        totalUsers: totalUsers,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch users" });
+    console.error(error);
+    res.status(500).json({ success: false, message: "Failed to fetch users" });
   }
 };
 
 exports.updateUserDetails = async (req, res) => {
   try {
     const userId = req.user.id;
-
     const {
       name,
       phoneNumber,
@@ -50,99 +54,96 @@ exports.updateUserDetails = async (req, res) => {
       if (isNaN(dobDate.getTime())) {
         return res
           .status(400)
-          .json({ message: "Invalid Date of Birth format." });
+          .json({ success: false, message: "Invalid Date of Birth format." });
       }
       dataToUpdate.DOB = dobDate.toISOString();
     }
+
     if (gender) {
-      if (!["MALE", "FEMALE", "OTHER"].includes(gender.toUpperCase())) {
-        return res.status(400).json({ message: "Invalid gender value." });
+      const validGenders = ["MALE", "FEMALE", "OTHER"];
+      if (!validGenders.includes(gender.toUpperCase())) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid gender value." });
       }
       dataToUpdate.gender = gender.toUpperCase();
     }
 
     if (Object.keys(dataToUpdate).length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No fields to update were provided." });
+      return res.status(400).json({
+        success: false,
+        message: "No fields to update were provided.",
+      });
     }
 
-    const updatedUser = await prisma.user.update({
-      where: {
-        id: userId,
-      },
-      data: dataToUpdate,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phoneNumber: true,
-        DOB: true,
-        gender: true,
-        address: true,
-        city: true,
-        state: true,
-        zipCode: true,
-        country: true,
-        role: true,
-      },
-    });
+    const updatedUser = await userService.updateUserById(userId, dataToUpdate);
 
     res.status(200).json({
+      success: true,
       message: "User details updated successfully",
-      user: updatedUser,
+      data: updatedUser,
     });
   } catch (error) {
     console.error("Error updating user details:", error);
-    res
-      .status(500)
-      .json({ message: "Server error while updating user details" });
+
+    if (error.code === "P2025") {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating user details",
+    });
   }
 };
 
 exports.updatePassword = async (req, res) => {
   try {
     const userId = req.user.id;
-
     const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
       return res
         .status(400)
-        .json({ message: "Please provide all required fields." });
+        .json({ success: false, message: "All password fields are required." });
     }
 
     if (newPassword !== confirmNewPassword) {
-      return res.status(400).json({ message: "New passwords do not match." });
+      return res
+        .status(400)
+        .json({ success: false, message: "New passwords do not match." });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    await userService.changeUserPassword(userId, currentPassword, newPassword);
 
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Incorrect current password." });
-    }
+    res
+      .status(200)
+      .json({ success: true, message: "Password updated successfully." });
+  } catch (error) {
+    console.error("Error updating password:", error);
 
-    const samePassword = await bcrypt.compare(newPassword, user.password);
-    if (samePassword) {
+    if (error.message === "UserNotFound") {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
+    }
+    if (error.message === "IncorrectCurrentPassword") {
+      return res
+        .status(401)
+        .json({ success: false, message: "Incorrect current password." });
+    }
+    if (error.message === "NewPasswordSameAsOld") {
       return res.status(400).json({
+        success: false,
         message: "New password cannot be the same as the current password.",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating password.",
     });
-
-    res.status(200).json({ message: "Password updated successfully." });
-  } catch (error) {
-    console.error("Error updating password:", error);
-    res.status(500).json({ message: "Server error while updating password." });
   }
 };

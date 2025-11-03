@@ -7,17 +7,20 @@ const getImageUrls = (files) => {
   return files.carImages.map((file) => file.path);
 };
 
-exports.createCar = async (carData, files) => {
-  const imageUrls = getImageUrls(files);
-
-  const { dealerId, designerId, workshopId, ...restOfCarData } = carData;
+exports.createCar = async (carData) => {
+  const {
+    dealerId,
+    designerId,
+    workshopId,
+    imageUrls,
+    primaryImage,
+    ...restOfCarData
+  } = carData;
 
   const dataForDatabase = {
     ...restOfCarData,
     carImages: imageUrls,
-    thumbnail:
-      imageUrls[0] ||
-      "https://placehold.co/800x600/EFEFEF/AAAAAA?text=Image+Not+Available",
+    thumbnail: primaryImage,
     dealer: {
       connect: { id: dealerId },
     },
@@ -30,38 +33,30 @@ exports.createCar = async (carData, files) => {
     dataForDatabase.workshop = { connect: { id: workshopId } };
   }
 
-  const dbQueryStartTime = Date.now();
   const newCar = await prisma.car.create({
     data: dataForDatabase,
   });
-  const dbQueryTime = Date.now() - dbQueryStartTime;
-  console.log(`[PERF] Prisma create query took: ${dbQueryTime}ms`);
   return newCar;
 };
 
 exports.getTotalCars = async () => {
-  const totalCars = await prisma.car.count();
-  return totalCars;
+  return prisma.car.count();
 };
 
 exports.getCarById = async (id) => {
-  const car = await prisma.car.findUnique({
-    where: { id: parseInt(id) },
+  return prisma.car.findUnique({
+    where: { id: id },
     include: {
       dealer: true,
-      ownerships: true,
+      //ownerships: true,
     },
   });
-
-  return car;
 };
 
 exports.getCarsByDealer = async (dealerId) => {
-  const id = parseInt(dealerId);
-
   const cars = await prisma.car.findMany({
     where: {
-      dealerId: id,
+      dealerId: dealerId,
     },
     select: {
       id: true,
@@ -85,56 +80,44 @@ exports.getCarsByDealer = async (dealerId) => {
   return cars;
 };
 
-exports.updateCar = async (id, updateData, files) => {
-  const carId = parseInt(id);
-
-  if (files && files.carImages) {
-    const newImageUrls = files.carImages.map((file) => file.path);
+exports.updateCarById = async (carId, dataToUpdate) => {
+  if (dataToUpdate.carImages) {
     const existingCar = await prisma.car.findUnique({
       where: { id: carId },
       select: { carImages: true },
     });
 
-    updateData.carImages = [...(existingCar?.carImages || []), ...newImageUrls];
+    const existingImages = existingCar?.carImages || [];
+    dataToUpdate.carImages = [...existingImages, ...dataToUpdate.carImages];
   }
 
-  // 2. Coerce string numbers to integers (Zod validator would be better)
-  // This step can be removed if you add a Zod validator for the update route
-  if (updateData.dealerId) {
-    updateData.dealerId = parseInt(updateData.dealerId);
-  }
-  if (updateData.kmsDriven) {
-    updateData.kmsDriven = parseInt(updateData.kmsDriven);
-  }
-
-  const updatedCar = await prisma.car.update({
+  return prisma.car.update({
     where: { id: carId },
-    data: updateData,
+    data: dataToUpdate,
   });
-
-  return updatedCar;
 };
 
 exports.deleteCar = async (id) => {
-  const carId = parseInt(id);
-
-  const deletedCar = await prisma.car.delete({
-    where: { id: carId },
-    select: { id: true },
+  return prisma.car.delete({
+    where: { id: id },
   });
-
-  return deletedCar;
 };
 
-exports.getAllCars = async (queryParams) => {
-  const { cursor, searchTerm, brands, sortBy, collectionType, designerId } =
-    queryParams;
-  const limit = parseInt(queryParams.limit) || 10;
+exports.getAllCars = async (options = {}) => {
+  const {
+    cursor,
+    searchTerm,
+    brands,
+    sortBy = "newest",
+    collectionType,
+    designerId,
+    limit = 10,
+  } = options;
 
   const where = {};
   if (collectionType)
     where.collectionType = { equals: collectionType.toUpperCase() };
-  if (designerId) where.designerId = parseInt(designerId);
+  if (designerId) where.designerId = designerId;
   if (searchTerm) {
     where.OR = [
       { title: { contains: searchTerm, mode: "insensitive" } },
@@ -166,6 +149,7 @@ exports.getAllCars = async (queryParams) => {
       title: true,
       brand: true,
       badges: true,
+      specs: true,
       ybtPrice: true,
       tuningStage: true,
       thumbnail: true,
@@ -173,20 +157,16 @@ exports.getAllCars = async (queryParams) => {
     },
   };
   if (cursor) {
-    prismaQuery.cursor = { id: parseInt(cursor) };
+    prismaQuery.cursor = { id: cursor }; // Already a number
     prismaQuery.skip = 1;
   }
   const results = await prisma.car.findMany(prismaQuery);
-
   const hasMore = results.length > limit;
   const cars = hasMore ? results.slice(0, limit) : results;
   const nextCursor = hasMore ? cars[cars.length - 1].id : null;
 
   return {
     data: cars,
-    pagination: {
-      hasMore,
-      nextCursor,
-    },
+    pagination: { hasMore, nextCursor },
   };
 };

@@ -1,121 +1,167 @@
 const carService = require("../services/carService");
+const { processUploadedImages } = require("../utils/fileHelper");
 
 exports.createCar = async (req, res) => {
   try {
+    const validatedData = req.body;
+    const { imageUrls, primaryImage } = processUploadedImages(
+      req.files,
+      "carImages"
+    );
+
+    const dataForService = {
+      ...validatedData,
+      imageUrls: imageUrls,
+      primaryImage: primaryImage,
+    };
+
+    const newCar = await carService.createCar(dataForService);
+    res.status(201).json({ success: true, data: newCar });
+  } catch (error) {
+    console.error("Error in creating a car:", error);
     if (
-      !req.files ||
-      !req.files.carImages ||
-      req.files.carImages.length === 0
+      error?.code === "P2002" &&
+      error.meta?.target?.includes("registrationNumber")
     ) {
-      return res.status(400).json({
-        errors: [{ message: "At least one car image is required." }],
+      return res.status(409).json({
+        success: false,
+        message: "A car with this registration number already exists.",
       });
     }
-
-    const newCar = await carService.createCar(req.body, req.files);
-    res.status(201).json(newCar);
-  } catch (error) {
-    console.error("💥 FAILED TO CREATE CAR:", error);
     res.status(500).json({
+      success: false,
       message: "Failed to create car.",
-      error: error.message,
     });
   }
 };
 
+//Add the zod validation for bike, once prisma schema is fixed, and move validation to middleware
 exports.getAllCars = async (req, res) => {
   try {
-    const result = await carService.getAllCars(req.query);
-    res.status(200).json(result);
+    const options = { ...req.query };
+    if (req.query.limit) {
+      options.limit = parseInt(req.query.limit, 10);
+    }
+    if (req.query.designerId) {
+      options.designerId = parseInt(req.query.designerId, 10);
+    }
+    if (req.query.cursor) {
+      options.cursor = parseInt(req.query.cursor, 10);
+    }
+    const result = await carService.getAllCars(options);
+    res.status(200).json({ success: true, ...result });
   } catch (error) {
-    console.error("❌ Error in getAllCars:", error);
-    res.status(500).json({ error: "Failed to fetch cars" });
+    console.error("Error in getAllCars:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch cars." });
   }
 };
 
 exports.getTotalCars = async (req, res) => {
   try {
     const total = await carService.getTotalCars();
-    res.status(200).json({ total });
+    res.status(200).json({ success: true, data: { totalCars: total } });
   } catch (error) {
     console.error("Failed to get total cars:", error);
-    res.status(500).json({ error: error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get total number of cars." });
   }
 };
 
 exports.getCarById = async (req, res) => {
   try {
     const { id } = req.params;
+
     const car = await carService.getCarById(id);
-
     if (!car) {
-      return res.status(404).json({ error: "Car not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Car not found." });
     }
-
-    res.status(200).json(car);
+    res.status(200).json({ success: true, data: car });
   } catch (err) {
     console.error(`Failed to get car ${req.params.id}:`, err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, message: "Failed to fetch car." });
   }
 };
 
 exports.getCarsByDealer = async (req, res) => {
   try {
     const { dealerId } = req.params;
-    const id = parseInt(dealerId, 10);
-
-    if (isNaN(id)) {
-      return res
-        .status(400)
-        .json({ message: "Dealer ID must be a valid number." });
-    }
-
-    const cars = await carService.getCarsByDealer(id);
-
-    res.status(200).json(cars);
+    const cars = await carService.getCarsByDealer(dealerId);
+    res.status(200).json({ success: true, data: cars });
   } catch (error) {
     console.error(
-      `💥 FAILED TO FETCH CARS FOR DEALER ${req.params.dealerId}:`,
+      `Failed to fetch cars for dealer ${req.params.dealerId}:`,
       error
     );
     res.status(500).json({
+      success: false,
       message: "Failed to fetch cars for the dealer.",
-      error: error.message,
     });
   }
 };
 
 exports.updateCar = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updatedCar = await carService.updateCar(id, req.body, req.files);
-    res.status(200).json(updatedCar);
+    //Add the zod validation for bike, once prisma schema is fixed, and move validation to middleware
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid car ID provided." });
+    }
+    const dataToUpdate = { ...req.body };
+    if (req.files && req.files.carImages) {
+      dataToUpdate.carImages = req.files.carImages.map((file) => file.path);
+    }
+    if (dataToUpdate.dealerId) {
+      dataToUpdate.dealerId = parseInt(dataToUpdate.dealerId, 10);
+    }
+    if (dataToUpdate.kmsDriven) {
+      dataToUpdate.kmsDriven = parseInt(dataToUpdate.kmsDriven, 10);
+    }
+    const updatedCar = await carService.updateCarById(id, dataToUpdate);
+    res.status(200).json({
+      success: true,
+      message: "Car updated successfully.",
+      data: updatedCar,
+    });
   } catch (err) {
-    console.error(`💥 FAILED TO UPDATE CAR ${req.params.id}:`, err);
-    res.status(400).json({ error: err.message });
+    console.error(`Failed to update car ${req.params.id}:`, err);
+    if (err.code === "P2025") {
+      return res
+        .status(404)
+        .json({ success: false, message: "Car not found." });
+    }
+    res.status(500).json({ success: false, message: "Failed to update car." });
   }
 };
 
 exports.deleteCar = async (req, res) => {
   try {
+    //Add the zod validation for bike, once prisma schema is fixed, and move validation to middleware
     const carId = parseInt(req.params.id, 10);
     if (isNaN(carId)) {
-      return res.status(400).json({ error: "Invalid car ID provided." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid car ID provided." });
     }
 
-    const deletedCar = await carService.deleteCar(carId);
+    await carService.deleteCar(carId);
 
     res.status(200).json({
+      success: true,
       message: "Car deleted successfully.",
-      deletedId: deletedCar.id,
     });
   } catch (err) {
     console.error("Error in deleteCar:", err);
-
     if (err.code === "P2025") {
-      return res.status(404).json({ error: "Car not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Car not found." });
     }
-    res.status(500).json({ error: "Failed to delete car." });
+    res.status(500).json({ success: false, message: "Failed to delete car." });
   }
 };
 

@@ -1,10 +1,9 @@
 const jwt = require("jsonwebtoken");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../utils/prisma");
 
 const protect = async (req, res, next) => {
   let token;
-
+  // Add guarded authentication of token and bearer
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
@@ -14,7 +13,7 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       req.user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
+        where: { id: decoded.id },
         select: { id: true, name: true, email: true, role: true },
       });
 
@@ -41,4 +40,27 @@ const admin = (req, res, next) => {
   }
 };
 
-module.exports = { protect, admin };
+const identifyUser = async (req, res, next) => {
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    try {
+      token = req.headers.authorization.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      req.user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: { id: true, name: true, email: true, role: true },
+      });
+    } catch (error) {
+      console.error("Optional auth error: Invalid token", error.message);
+      req.user = null;
+    }
+  }
+
+  next();
+};
+
+module.exports = { protect, admin, identifyUser };

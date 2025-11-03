@@ -1,24 +1,36 @@
 const bikeService = require("../services/bikeService");
+const { processUploadedImages } = require("../utils/fileHelper");
 
 exports.createBike = async (req, res) => {
   try {
+    const validatedData = req.body;
+    const { imageUrls, primaryImage } = processUploadedImages(
+      req.files,
+      "bikeImages"
+    );
+
+    const dataForService = {
+      ...validatedData,
+      imageUrls: imageUrls,
+      primaryImage: primaryImage,
+    };
+
+    const newBike = await bikeService.createBike(dataForService);
+    res.status(201).json({ success: true, data: newBike });
+  } catch (error) {
+    console.error("Error in creating bike:", error);
     if (
-      !req.files ||
-      !req.files.bikeImages ||
-      req.files.bikeImages.length === 0
+      error?.code === "P2002" &&
+      error.meta?.target?.includes("registrationNumber")
     ) {
-      return res.status(400).json({
-        errors: [{ message: "At least one bike image is required." }],
+      return res.status(409).json({
+        success: false,
+        message: "A bike with this registration number already exists.",
       });
     }
-
-    const newBike = await bikeService.createBike(req.body, req.files);
-    res.status(201).json(newBike);
-  } catch (error) {
-    console.error("💥 FAILED TO CREATE BIKE:", error);
     res.status(500).json({
+      success: false,
       message: "Failed to create bike.",
-      error: error.message,
     });
   }
 };
@@ -26,20 +38,22 @@ exports.createBike = async (req, res) => {
 exports.getAllBikes = async (req, res) => {
   try {
     const responseData = await bikeService.getAllBikes(req.query);
-    res.status(200).json(responseData);
+    res.status(200).json({ success: true, ...responseData });
   } catch (error) {
     console.error("❌ Error in getAllBikes controller:", error);
-    res.status(500).json({ error: "Failed to fetch bikes" });
+    res.status(500).json({ success: false, message: "Failed to fetch bikes" });
   }
 };
 
 exports.getTotalBikes = async (req, res) => {
   try {
     const total = await bikeService.getTotalBikes();
-    res.status(200).json({ total });
+    res.status(200).json({ success: true, data: total });
   } catch (error) {
     console.error("Failed to get total bikes:", error);
-    res.status(500).json({ error: error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get total number of bikes" });
   }
 };
 
@@ -48,44 +62,74 @@ exports.getBikeById = async (req, res) => {
     const { id } = req.params;
 
     const bike = await bikeService.getBikeById(id);
-
-    if (!bike) return res.status(404).json({ error: "Bike not found" });
-    res.status(200).json(bike);
+    if (!bike) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Bike not found." });
+    }
+    res.status(200).json({ success: true, data: bike });
   } catch (error) {
     console.error(`Failed to get bike ${req.params.id}:`, error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, message: "Failed to fetch bike." });
   }
 };
 
 exports.updateBike = async (req, res) => {
+  //Add the zod validation for bike, once prisma schema is fixed, and move validation to middleware
   try {
     const { id } = req.params;
-    const updatedBike = await bikeService.updateBike(id, req.body, req.files);
-    res.status(200).json(updatedBike);
+
+    const dataToUpdate = { ...req.body };
+    const { files } = req;
+    if (files) {
+      if (files.bikeImages) {
+        dataToUpdate.bikeImages = files.bikeImages.map((file) => file.path);
+      }
+      if (files.thumbnail && files.thumbnail[0]) {
+        dataToUpdate.thumbnail = files.thumbnail[0].path;
+      }
+    }
+    if (dataToUpdate.vipNumber !== undefined) {
+      dataToUpdate.vipNumber = ["true", true].includes(dataToUpdate.vipNumber);
+    }
+    ["sellingPrice", "cutOffPrice", "ybtPrice"].forEach((field) => {
+      if (dataToUpdate[field]) {
+        dataToUpdate[field] = parseFloat(dataToUpdate[field]);
+      }
+    });
+    const updatedBike = await bikeService.updateBikeById(id, dataToUpdate);
+
+    res.status(200).json({
+      success: true,
+      message: "Bike updated successfully.",
+      data: updatedBike,
+    });
   } catch (error) {
     console.error(`Error updating bike ${req.params.id}:`, error);
-    res.status(400).json({ error: error.message });
+    if (error.code === "P2025") {
+      return res
+        .status(404)
+        .json({ success: false, message: "Bike not found." });
+    }
+    res.status(500).json({ success: false, message: "Failed to update bike." });
   }
 };
 
 exports.deleteBike = async (req, res) => {
   try {
-    const bikeId = parseInt(req.params.id, 10);
-    if (isNaN(bikeId)) {
-      return res.status(400).json({ error: "Invalid bike ID provided." });
-    }
-
-    const deleteBike = await bikeService.deleteBikeById(bikeId);
-    res.status(200).json({
-      message: "Bike deleted successfully.",
-      deletedId: deleteBike.id,
-    });
+    const { id } = req.params;
+    await bikeService.deleteBikeById(id);
+    res
+      .status(200)
+      .json({ success: true, message: "Bike deleted successfully." });
   } catch (error) {
     console.error("Error deleting bike:", error);
     if (error.code === "P2025") {
-      return res.status(404).json({ error: "Bike not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Bike not found." });
     }
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, message: "Failed to delete bike." });
   }
 };
 

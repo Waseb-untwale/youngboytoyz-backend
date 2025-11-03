@@ -7,16 +7,13 @@ const getImageUrls = (files) => {
   return files.bikeImages.map((file) => file.path);
 };
 
-exports.createBike = async (bikeData, files) => {
-  const imageUrls = getImageUrls(files);
-  const { dealerId, ...restOfBikeData } = bikeData;
+exports.createBike = async (bikeData) => {
+  const { dealerId, imageUrls, primaryImage, ...restOfBikeData } = bikeData;
 
   const dataForDatabase = {
     ...restOfBikeData,
     bikeImages: imageUrls,
-    thumbnail:
-      imageUrls[0] ||
-      "https://placehold.co/800x600/EFEFEF/AAAAAA?text=Image+Not+Available",
+    thumbnail: primaryImage,
     dealer: {
       connect: { id: dealerId },
     },
@@ -24,11 +21,15 @@ exports.createBike = async (bikeData, files) => {
 
   const newBike = await prisma.bike.create({
     data: dataForDatabase,
+    include: {
+      dealer: true,
+    },
   });
 
   return newBike;
 };
 
+//Create a search by title endpoint
 exports.getAllBikes = async (queryParams) => {
   // 1. Sanitize and prepare inputs
   const { cursor, searchTerm, brands } = queryParams;
@@ -38,7 +39,6 @@ exports.getAllBikes = async (queryParams) => {
     ? queryParams.sortBy
     : "newest";
 
-  // 2. Build dynamic WHERE clause
   const where = {};
   if (searchTerm) {
     where.OR = [
@@ -54,7 +54,6 @@ exports.getAllBikes = async (queryParams) => {
     if (brandList.length > 0) where.brand = { in: brandList };
   }
 
-  // 3. Build dynamic ORDER BY clause
   const orderByMap = {
     name_asc: [{ title: "asc" }, { id: "asc" }],
     name_desc: [{ title: "desc" }, { id: "asc" }],
@@ -63,7 +62,6 @@ exports.getAllBikes = async (queryParams) => {
   };
   const orderBy = orderByMap[sortBy] || orderByMap.newest;
 
-  // 4. Construct the Prisma query
   const prismaQuery = {
     take: limit + 1,
     where,
@@ -80,19 +78,16 @@ exports.getAllBikes = async (queryParams) => {
     },
   };
 
-  // 5. ✨ SIMPLIFIED CURSOR LOGIC ✨
   if (cursor) {
     prismaQuery.cursor = { id: parseInt(cursor) };
     prismaQuery.skip = 1;
   }
   const results = await prisma.bike.findMany(prismaQuery);
 
-  // 6. ✨ SIMPLIFIED PAGINATION LOGIC ✨
   const hasMore = results.length > limit;
   const bikes = hasMore ? results.slice(0, limit) : results;
   const nextCursor = hasMore ? bikes[bikes.length - 1].id : null;
 
-  // 7. Prepare the final response
   return {
     data: bikes,
     pagination: { hasMore, nextCursor },
@@ -100,38 +95,15 @@ exports.getAllBikes = async (queryParams) => {
   };
 };
 
-exports.updateBike = async (id, updateData, files) => {
-  const bikeId = parseInt(id);
-  const dataToUpdate = { ...updateData };
-
-  if (files && files.bikeImages) {
-    dataToUpdate.bikeImages = files.bikeImages.map((file) => file.path);
-  }
-  if (files && files.thumbnail && files.thumbnail[0]) {
-    dataToUpdate.thumbnail = files.thumbnail[0].path;
-  }
-
-  // 2. Coerce data types (A Zod validator is the best place for this)
-  if (dataToUpdate.vipNumber !== undefined) {
-    dataToUpdate.vipNumber = ["true", true].includes(dataToUpdate.vipNumber);
-  }
-  ["sellingPrice", "cutOffPrice", "ybtPrice"].forEach((field) => {
-    if (dataToUpdate[field]) {
-      dataToUpdate[field] = parseFloat(dataToUpdate[field]);
-    }
-  });
-
-  const updatedBike = await prisma.bike.update({
+exports.updateBikeById = async (bikeId, dataToUpdate) => {
+  return prisma.bike.update({
     where: { id: bikeId },
     data: dataToUpdate,
   });
-
-  return updatedBike;
 };
 
 exports.getTotalBikes = async () => {
-  const totalBikes = await prisma.bike.count();
-  return totalBikes;
+  return prisma.bike.count();
 };
 
 exports.getBikeById = async (id) => {
@@ -139,20 +111,15 @@ exports.getBikeById = async (id) => {
     where: { id: parseInt(id) },
     include: {
       dealer: true,
-      ownerships: true,
     },
   });
-
   return bike;
 };
 
 exports.deleteBikeById = async (id) => {
-  const bikeId = parseInt(id);
-  const deletedBike = await prisma.bike.delete({
-    where: { id: bikeId },
-    select: { id: true },
+  return prisma.bike.delete({
+    where: { id: id },
   });
-  return deletedBike;
 };
 
 // exports.getAllBikes = async (queryParams) => {

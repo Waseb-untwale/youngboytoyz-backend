@@ -1,99 +1,119 @@
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const dealerService = require("../services/dealerService");
+
+//Add zod validation for all endpoints so that controller looks clean
 
 exports.createDealer = async (req, res) => {
   try {
-    const { name, email, phone, address, city, state } = req.body;
+    const { name, email } = req.body;
     if (!name || !email) {
-      return res
-        .status(400)
-        .json({ message: "Name and email are required fields." });
-    }
-
-    const newDealer = await prisma.dealer.create({
-      data: { name, email, phone, address, city, state },
-    });
-
-    res.status(201).json(newDealer);
-  } catch (error) {
-    if (error.code === "P2002") {
-      return res.status(409).json({
-        message: `A dealer with that ${error.meta.target.join(
-          ", "
-        )} already exists.`,
+      return res.status(400).json({
+        success: false,
+        message: "Name and email are required fields.",
       });
     }
+    const newDealer = await dealerService.createDealer(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Dealer created successfully.",
+      data: newDealer,
+    });
+  } catch (error) {
     console.error("Failed to create dealer:", error);
-    res.status(500).json({ message: "Unable to create dealer." });
+    if (error.code === "P2002") {
+      return res.status(409).json({
+        success: false,
+        message: "A dealer with this email already exists.",
+      });
+    }
+    res
+      .status(500)
+      .json({ success: false, message: "Unable to create dealer." });
   }
 };
 
 exports.getAllDealers = async (req, res) => {
   try {
-    const dealers = await prisma.dealer.findMany();
-    res.status(200).json(dealers);
+    const dealers = await dealerService.getAllDealers();
+    res.status(200).json({ success: true, data: dealers });
   } catch (error) {
     console.error("Failed to fetch dealers:", error);
-    res.status(500).json({ message: "Unable to fetch dealers." });
+    res
+      .status(500)
+      .json({ success: false, message: "Unable to fetch dealers." });
   }
 };
 
 exports.getDealerDetails = async (req, res) => {
   try {
-    const { id } = req.params;
-    const dealer = await prisma.dealer.findUnique({
-      where: { id: parseInt(id) },
-      // --- Enhanced with 'include' ---
-      include: {
-        cars: true, // Include all cars listed by this dealer
-        bikes: true, // Include all bikes listed by this dealer
-      },
-    });
-
-    if (!dealer) {
-      return res.status(404).json({ message: "Dealer not found" });
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid dealer ID provided." });
     }
-    res.status(200).json(dealer);
+    const dealer = await dealerService.getDealerDetails(id);
+    if (!dealer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Dealer not found." });
+    }
+    res.status(200).json({ success: true, data: dealer });
   } catch (error) {
     console.error("Failed to fetch dealer details:", error);
-    res.status(500).json({ message: "Unable to fetch dealer details." });
+    res
+      .status(500)
+      .json({ success: false, message: "Unable to fetch dealer details." });
   }
 };
 
 exports.updateDealer = async (req, res) => {
   try {
-    const { id } = req.params;
-    const dataToUpdate = req.body;
-
-    const updatedDealer = await prisma.dealer.update({
-      where: { id: parseInt(id) },
-      data: dataToUpdate,
-    });
-
-    res.status(200).json(updatedDealer);
-  } catch (error) {
-    if (error.code === "P2025") {
-      // Handles record not found
-      return res.status(404).json({ message: "Dealer not found." });
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid dealer ID provided." });
     }
+    const updatedDealer = await dealerService.updateDealerById(id, req.body);
+    res.status(200).json({
+      success: true,
+      message: "Dealer updated successfully.",
+      data: updatedDealer,
+    });
+  } catch (error) {
     console.error("Failed to update dealer:", error);
-    res.status(500).json({ message: "Unable to update dealer." });
+    if (error.code === "P2025") {
+      return res
+        .status(404)
+        .json({ success: false, message: "Dealer not found." });
+    }
+    res
+      .status(500)
+      .json({ success: false, message: "Unable to update dealer." });
   }
 };
 
 exports.deleteDealer = async (req, res) => {
   try {
-    const { id } = req.params;
-    await prisma.dealer.delete({
-      where: { id: parseInt(id) },
-    });
-    res.status(204).send();
-  } catch (error) {
-    if (error.code === "P2025") {
-      // Handles record not found
-      return res.status(404).json({ message: "Dealer not found." });
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid dealer ID provided." });
     }
+    await dealerService.deleteDealerById(id);
+    res
+      .status(200)
+      .json({ success: true, message: "Dealer deleted successfully." });
+  } catch (error) {
     console.error("Failed to delete dealer:", error);
-    res.status(500).json({ message: "Unable to delete dealer." });
+    if (error.code === "P2025") {
+      return res
+        .status(404)
+        .json({ success: false, message: "Dealer not found." });
+    }
+    res
+      .status(500)
+      .json({ success: false, message: "Unable to delete dealer." });
   }
 };

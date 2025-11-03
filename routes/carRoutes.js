@@ -2,26 +2,36 @@ const express = require("express");
 const router = express.Router();
 const carController = require("../controllers/carController");
 const upload = require("../middleware/upload");
-
-const { protect } = require("../middleware/authMiddleware");
-const { validateCreateCar } = require("../validators/car.validator");
+const validate = require("../validators/Validator");
+const { protect, admin } = require("../middleware/authMiddleware");
+const {
+  createCarSchema,
+  getCarByIdSchema,
+  getCarsByDealerSchema,
+  updateCarSchema,
+} = require("../validators/car.validator");
 
 router.post(
   "/",
-  // protect,
-  // admin,
+  protect,
+  admin,
   upload.fields([{ name: "carImages", maxCount: 10 }]),
-  validateCreateCar,
+  validate(createCarSchema),
   carController.createCar
 );
 
 router.get("/", carController.getAllCars);
 router.get("/count", carController.getTotalCars);
-router.get("/:id", carController.getCarById);
-router.get("/dealer/:dealerId", carController.getCarsByDealer);
+router.get("/:id", validate(getCarByIdSchema), carController.getCarById);
+router.get(
+  "/dealer/:dealerId",
+  validate(getCarsByDealerSchema),
+  carController.getCarsByDealer
+);
 router.put(
   "/:id",
   upload.fields([{ name: "carImages", maxCount: 10 }]),
+  validate(updateCarSchema),
   carController.updateCar
 );
 // router.post("/:carId/book", protect, carController.bookCar);

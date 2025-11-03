@@ -2,16 +2,25 @@ const prisma = require("../utils/prisma");
 
 exports.getVehiclesCount = async (req, res) => {
   try {
-    const carCount = await prisma.car.count();
-    const bikeCount = await prisma.bike.count();
+    //currently doesnt need a dedicated service, only required on admin dashboard
+    const [carCount, bikeCount] = await Promise.all([
+      prisma.car.count(),
+      prisma.bike.count(),
+    ]);
 
     res.status(200).json({
-      totalVehicles: carCount + bikeCount,
-      cars: carCount,
-      bike: bikeCount,
+      success: true,
+      data: {
+        totalVehicles: carCount + bikeCount,
+        cars: carCount,
+        bikes: bikeCount,
+      },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Failed to get vehicle counts:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch vehicle counts." });
   }
 };
 
